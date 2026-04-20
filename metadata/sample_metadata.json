@@ -1,0 +1,1102 @@
+{
+  "source_file": "F:\\Collab\\plant_breeding\\code\\meta_data\\ERC000022.xml",
+  "total_field_groups": 24,
+  "field_groups": [
+    {
+      "group_name": "Organism characteristics: ecosystem",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "trophic_level",
+          "field_type": "TEXT_CHOICE_FIELD",
+          "text_values": [
+            "autotroph",
+            "carboxydotroph",
+            "chemoautotroph",
+            "chemoheterotroph",
+            "chemolithoautotroph",
+            "chemolithotroph",
+            "chemoorganoheterotroph",
+            "chemoorganotroph",
+            "chemosynthetic",
+            "chemotroph",
+            "copiotroph",
+            "diazotroph",
+            "facultative autotroph",
+            "heterotroph",
+            "lithoautotroph",
+            "lithoheterotroph",
+            "lithotroph",
+            "methanotroph",
+            "methylotroph",
+            "mixotroph",
+            "obligate chemoautolithotroph",
+            "oligotroph",
+            "organoheterotroph",
+            "organotroph",
+            "photoautotroph",
+            "photoheterotroph",
+            "photolithoautotroph",
+            "photolithotroph",
+            "photosynthetic",
+            "phototroph"
+          ]
+        },
+        {
+          "name": "observed_biotic_relationship",
+          "field_type": "TEXT_CHOICE_FIELD",
+          "text_values": [
+            "commensal",
+            "free living",
+            "mutualism",
+            "parasite",
+            "symbiont"
+          ]
+        },
+        {
+          "name": "known_pathogenicity",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "relationship_to_oxygen",
+          "field_type": "TEXT_CHOICE_FIELD",
+          "text_values": [
+            "aerobe",
+            "anaerobe",
+            "facultative",
+            "microaerophilic",
+            "microanaerobe",
+            "obligate aerobe",
+            "obligate anaerobe"
+          ]
+        },
+        {
+          "name": "propagation",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "sample collection: methods, storage and transport",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "sample_collection_device",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "sample_collection_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "sample_storage_conditions",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "local environment conditions: soil",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "soil_taxonomicfao_classification",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "soil_taxonomiclocal_classification",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "soil_taxonomiclocal_classification_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "soil_type",
+          "field_type": "TEXT_CHOICE_FIELD",
+          "text_values": [
+            "Acrisol",
+            "Albeluvisol",
+            "Alisol",
+            "Andosol",
+            "Anthrosol",
+            "Arenosol",
+            "Calcisol",
+            "Cambisol",
+            "Chernozem",
+            "Cryosol",
+            "Durisol",
+            "Ferralsol",
+            "Fluvisol",
+            "Gleysol",
+            "Gypsisol",
+            "Histosol",
+            "Kastanozem",
+            "Leptosol",
+            "Lixisol",
+            "Luvisol",
+            "Nitisol",
+            "Phaeozem",
+            "Planosol",
+            "Plinthosol",
+            "Podzol",
+            "Regosol",
+            "Solonchak",
+            "Solonetz",
+            "Stagnosol",
+            "Technosol",
+            "Umbrisol",
+            "Vertisol"
+          ]
+        },
+        {
+          "name": "soil_type_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "soil_texture_measurement",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "soil_texture_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "sample collection: core sample properties",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "microbial_biomass",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "non-sample terms: study or project",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "project_name",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "non-sample terms",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "ploidy",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "number_of_replicons",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "extrachromosomal_elements",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "estimated_size",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "target_gene",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "target_subfragment",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "multiplex_identifiers",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "sequence_quality_check",
+          "field_type": "TEXT_CHOICE_FIELD",
+          "text_values": [
+            "manual",
+            "none",
+            "software"
+          ]
+        },
+        {
+          "name": "chimera_check_software",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "relevant_electronic_resources",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "relevant_standard_operating_procedures",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "Collection event information",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "collection_date",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "altitude",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "geographic_location_latitude",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "geographic_location_longitude",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "geographic_location_region_and_locality",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "broadscale_environmental_context",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "local_environmental_context",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "environmental_medium",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "elevation",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "sample collection",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "amount_or_size_of_sample_collected",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "sieving",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "microbial_biomass_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "horizon_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "unusual properties",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "extreme_unusual_propertiesheavy_metals",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "extreme_unusual_propertiesheavy_metals_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "extreme_unusual_propertiesal_saturation",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "extreme_unusual_propertiesal_saturation_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "Organism characteristics",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "geographic_location_country_andor_sea",
+          "field_type": "TEXT_CHOICE_FIELD",
+          "text_values": [
+            "Afghanistan",
+            "Albania",
+            "Algeria",
+            "American Samoa",
+            "Andorra",
+            "Angola",
+            "Anguilla",
+            "Antarctica",
+            "Antigua and Barbuda",
+            "Arctic Ocean",
+            "Argentina",
+            "Armenia",
+            "Aruba",
+            "Ashmore and Cartier Islands",
+            "Atlantic Ocean",
+            "Australia",
+            "Austria",
+            "Azerbaijan",
+            "Bahamas",
+            "Bahrain",
+            "Baker Island",
+            "Baltic Sea",
+            "Bangladesh",
+            "Barbados",
+            "Bassas da India",
+            "Belarus",
+            "Belgium",
+            "Belize",
+            "Benin",
+            "Bermuda",
+            "Bhutan",
+            "Bolivia",
+            "Borneo",
+            "Bosnia and Herzegovina",
+            "Botswana",
+            "Bouvet Island",
+            "Brazil",
+            "British Virgin Islands",
+            "Brunei",
+            "Bulgaria",
+            "Burkina Faso",
+            "Burundi",
+            "Cambodia",
+            "Cameroon",
+            "Canada",
+            "Cape Verde",
+            "Cayman Islands",
+            "Central African Republic",
+            "Chad",
+            "Chile",
+            "China",
+            "Christmas Island",
+            "Clipperton Island",
+            "Cocos Islands",
+            "Colombia",
+            "Comoros",
+            "Cook Islands",
+            "Coral Sea Islands",
+            "Costa Rica",
+            "Cote d'Ivoire",
+            "Croatia",
+            "Cuba",
+            "Curacao",
+            "Cyprus",
+            "Czechia",
+            "Czech Republic",
+            "Democratic Republic of the Congo",
+            "Denmark",
+            "Djibouti",
+            "Dominica",
+            "Dominican Republic",
+            "Ecuador",
+            "Egypt",
+            "El Salvador",
+            "Equatorial Guinea",
+            "Eritrea",
+            "Estonia",
+            "Eswatini",
+            "Ethiopia",
+            "Europa Island",
+            "Falkland Islands (Islas Malvinas)",
+            "Faroe Islands",
+            "Fiji",
+            "Finland",
+            "France",
+            "French Guiana",
+            "French Polynesia",
+            "French Southern and Antarctic Lands",
+            "Gabon",
+            "Gambia",
+            "Gaza Strip",
+            "Georgia",
+            "Germany",
+            "Ghana",
+            "Gibraltar",
+            "Glorioso Islands",
+            "Greece",
+            "Greenland",
+            "Grenada",
+            "Guadeloupe",
+            "Guam",
+            "Guatemala",
+            "Guernsey",
+            "Guinea",
+            "Guinea-Bissau",
+            "Guyana",
+            "Haiti",
+            "Heard Island and McDonald Islands",
+            "Honduras",
+            "Hong Kong",
+            "Howland Island",
+            "Hungary",
+            "Iceland",
+            "India",
+            "Indian Ocean",
+            "Indonesia",
+            "Iran",
+            "Iraq",
+            "Ireland",
+            "Isle of Man",
+            "Israel",
+            "Italy",
+            "Jamaica",
+            "Jan Mayen",
+            "Japan",
+            "Jarvis Island",
+            "Jersey",
+            "Johnston Atoll",
+            "Jordan",
+            "Juan de Nova Island",
+            "Kazakhstan",
+            "Kenya",
+            "Kerguelen Archipelago",
+            "Kingman Reef",
+            "Kiribati",
+            "Kosovo",
+            "Kuwait",
+            "Kyrgyzstan",
+            "Laos",
+            "Latvia",
+            "Lebanon",
+            "Lesotho",
+            "Liberia",
+            "Libya",
+            "Liechtenstein",
+            "Line Islands",
+            "Lithuania",
+            "Luxembourg",
+            "Macau",
+            "Madagascar",
+            "Malawi",
+            "Malaysia",
+            "Maldives",
+            "Mali",
+            "Malta",
+            "Marshall Islands",
+            "Martinique",
+            "Mauritania",
+            "Mauritius",
+            "Mayotte",
+            "Mediterranean Sea",
+            "Mexico",
+            "Micronesia, Federated States of",
+            "Midway Islands",
+            "Moldova",
+            "Monaco",
+            "Mongolia",
+            "Montenegro",
+            "Montserrat",
+            "Morocco",
+            "Mozambique",
+            "Myanmar",
+            "Namibia",
+            "Nauru",
+            "Navassa Island",
+            "Nepal",
+            "Netherlands",
+            "New Caledonia",
+            "New Zealand",
+            "Nicaragua",
+            "Niger",
+            "Nigeria",
+            "Niue",
+            "Norfolk Island",
+            "North Korea",
+            "North Macedonia",
+            "North Sea",
+            "Northern Mariana Islands",
+            "Norway",
+            "Oman",
+            "Pacific Ocean",
+            "Pakistan",
+            "Palau",
+            "Palmyra Atoll",
+            "Panama",
+            "Papua New Guinea",
+            "Paracel Islands",
+            "Paraguay",
+            "Peru",
+            "Philippines",
+            "Pitcairn Islands",
+            "Poland",
+            "Portugal",
+            "Puerto Rico",
+            "Qatar",
+            "Republic of the Congo",
+            "Reunion",
+            "Romania",
+            "Ross Sea",
+            "Russia",
+            "Rwanda",
+            "Saint Barthelemy",
+            "Saint Helena",
+            "Saint Kitts and Nevis",
+            "Saint Lucia",
+            "Saint Pierre and Miquelon",
+            "Saint Vincent and the Grenadines",
+            "Samoa",
+            "San Marino",
+            "Saint Martin",
+            "Sao Tome and Principe",
+            "Saudi Arabia",
+            "Senegal",
+            "Serbia",
+            "Seychelles",
+            "Sierra Leone",
+            "Singapore",
+            "Sint Maarten",
+            "Slovakia",
+            "Slovenia",
+            "Solomon Islands",
+            "Somalia",
+            "South Africa",
+            "South Georgia and the South Sandwich Islands",
+            "South Korea",
+            "South Sudan",
+            "Southern Ocean",
+            "Spain",
+            "Spratly Islands",
+            "Sri Lanka",
+            "State of Palestine",
+            "Sudan",
+            "Suriname",
+            "Svalbard",
+            "Sweden",
+            "Switzerland",
+            "Syria",
+            "Taiwan",
+            "Tajikistan",
+            "Tanzania",
+            "Tasman Sea",
+            "Thailand",
+            "Timor-Leste",
+            "Togo",
+            "Tokelau",
+            "Tonga",
+            "Trinidad and Tobago",
+            "Tromelin Island",
+            "Tunisia",
+            "Turkey",
+            "Turkmenistan",
+            "Turks and Caicos Islands",
+            "Tuvalu",
+            "USA",
+            "Uganda",
+            "Ukraine",
+            "United Arab Emirates",
+            "United Kingdom",
+            "Uruguay",
+            "Uzbekistan",
+            "Vanuatu",
+            "Venezuela",
+            "Viet Nam",
+            "Wake Island",
+            "Virgin Islands",
+            "Wallis and Futuna",
+            "West Bank",
+            "Western Sahara",
+            "Yemen",
+            "Zambia",
+            "Zimbabwe",
+            "missing",
+            "missing: control sample",
+            "missing: data agreement established pre-2023",
+            "missing: endangered species",
+            "missing: human-identifiable",
+            "missing: lab stock",
+            "missing: sample group",
+            "missing: synthetic construct",
+            "missing: third party data",
+            "not applicable",
+            "not collected",
+            "not provided",
+            "restricted access"
+          ]
+        }
+      ]
+    },
+    {
+      "group_name": "host disorder",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "host_disease_status",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "host description",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "host_scientific_name",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "link",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "link_to_climate_information",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "link_to_classification_information",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "links_to_additional_analysis",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "local environment conditions",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "current_land_use",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "current_vegetation",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "current_vegetation_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "soil_horizon",
+          "field_type": "TEXT_CHOICE_FIELD",
+          "text_values": [
+            "A horizon",
+            "B horizon",
+            "E horizon",
+            "O horizon",
+            "Permafrost",
+            "R layer"
+          ]
+        },
+        {
+          "name": "drainage_classification",
+          "field_type": "TEXT_CHOICE_FIELD",
+          "text_values": [
+            "excessively drained",
+            "moderately well",
+            "poorly",
+            "somewhat poorly",
+            "very poorly",
+            "well"
+          ]
+        },
+        {
+          "name": "temperature",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "ph",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "ph_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "water_content",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "slope_gradient",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "slope_aspect",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "profile_position",
+          "field_type": "TEXT_CHOICE_FIELD",
+          "text_values": [
+            "backslope",
+            "footslope",
+            "shoulder",
+            "summit",
+            "toeslope"
+          ]
+        }
+      ]
+    },
+    {
+      "group_name": "concentration measurement",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "water_content_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "total_organic_carbon_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "total_nitrogen_content_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "organic_matter",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "organic_nitrogen",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "total_organic_carbon",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "total_nitrogen_content",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "salinity_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "Pointer to physical material",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "source_material_identifiers",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "local environment history",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "historyprevious_land_use",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "previous_land_use_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "historycrop_rotation",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "historyagrochemical_additions",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "historytillage",
+          "field_type": "TEXT_CHOICE_FIELD",
+          "text_values": [
+            "chisel",
+            "cutting disc",
+            "disc plough",
+            "drill",
+            "mouldboard",
+            "ridge till",
+            "strip tillage",
+            "tined",
+            "zonal tillage"
+          ]
+        },
+        {
+          "name": "historyfire",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "historyflooding",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "historyextreme_events",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "mean_seasonal_temperature",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "mean_seasonal_precipitation",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "mean_annual_precipitation",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "mean_annual_temperature",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "host details",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "host_specificity_or_range",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "treatment",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "perturbation",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "experimental factor and block",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "negative_control_type",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "positive_control_type",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "experimental_factor",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "Organism characteristics: genetic",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "encoded_traits",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "subspecific_genetic_lineage",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "taxonomic_classification",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "Reference",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "isolation_and_growth_condition",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "annotation_source",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "reference_for_biomaterial",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "sample processing",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "sample_pooling",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "sample_material_processing",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "sample_volume_or_weight_for_dna_extraction",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "nucleic_acid_extraction",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "nucleic_acid_amplification",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "library_size",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "library_reads_sequenced",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "library_construction_method",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "library_vector",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "library_screening_strategy",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "pcr_conditions",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "pcr_primers",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        },
+        {
+          "name": "adapters",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    },
+    {
+      "group_name": "Environmental information",
+      "restriction_type": "Any number or none of the fields",
+      "fields": [
+        {
+          "name": "depth",
+          "field_type": "TEXT_FIELD",
+          "text_values": null
+        }
+      ]
+    }
+  ]
+}

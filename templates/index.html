@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Crop Development Research Assistant — GPT-4o powered chat with dynamic environmental factor analysis for European conditions.">
+    <title>Crop Development Research Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header id="app-header">
+        <div class="header-left">
+            <div class="logo-icon">🌱</div>
+            <div>
+                <h1>Crop Development Assistant</h1>
+                <p class="subtitle">European Conditions Research • GPT-4o Powered</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <span class="status-indicator" id="statusIndicator">
+                <span class="status-dot"></span>
+                <span id="statusText">Ready</span>
+            </span>
+        </div>
+    </header>
+
+    <!-- Main split-screen container -->
+    <main id="split-container">
+        <!-- LEFT PANEL: Chat -->
+        <section id="chat-panel" class="panel">
+            <div class="panel-header">
+                <h2>💬 Research Chat</h2>
+                <button id="clearChatBtn" class="btn-ghost" title="Clear chat">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                </button>
+            </div>
+
+            <div id="chatMessages" class="chat-messages">
+                <div class="message assistant">
+                    <div class="message-avatar">🌿</div>
+                    <div class="message-content">
+                        <p>Welcome! I'm your crop development research assistant, specialized in European field conditions.</p>
+                        <p>Select environmental factors on the right panel, then ask me anything about crop optimization, lab parameters, field conditions, or EU regulations.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="chatInput" class="chat-input-area">
+                <div class="input-wrapper">
+                    <textarea id="messageInput" 
+                              placeholder="Ask about crop development factors..."
+                              rows="1"
+                              maxlength="2000"></textarea>
+                    <button id="sendBtn" class="btn-send" title="Send message">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                    </button>
+                </div>
+                <p class="input-hint">Press Enter to send • Shift+Enter for new line</p>
+            </div>
+        </section>
+
+        <!-- Resize handle -->
+        <div id="resizeHandle" class="resize-handle" title="Drag to resize">
+            <div class="handle-grip"></div>
+        </div>
+
+        <!-- RIGHT PANEL: Factors Form -->
+        <section id="form-panel" class="panel">
+            <div class="panel-header">
+                <h2>🧪 Environmental Factors</h2>
+                <button id="clearFactorsBtn" class="btn-ghost" title="Clear all factors">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                </button>
+            </div>
+
+            <div class="form-content">
+                <!-- Environment selector -->
+                <div class="form-group" style="display: flex; gap: 10px; align-items: flex-end;">
+                    <div style="flex: 1;">
+                        <label for="envDropdown" class="form-label">Environment Type</label>
+                        <div class="select-wrapper">
+                            <select id="envDropdown" class="form-select">
+                                <option value="">— Select Environment —</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button id="autoSendBtn" class="btn-send" title="Auto-generate prompt" style="width: 44px; height: 44px; flex-shrink: 0;" disabled>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                    </button>
+                </div>
+
+                <!-- Dynamic subsections -->
+                <div id="factorsContainer" class="factors-container">
+                    <div class="empty-state">
+                        <div class="empty-icon">📋</div>
+                        <p>Select an environment type above to view and manage factors.</p>
+                    </div>
+                </div>
+
+                <!-- Selected factors summary -->
+                <div id="selectedSummary" class="selected-summary hidden">
+                    <div class="summary-header">
+                        <h3>Selected Factors</h3>
+                        <span id="selectedCount" class="badge">0</span>
+                    </div>
+                    <div id="selectedList" class="selected-list"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // ═══════════════════════════════════════════
+        // STATE
+        // ═══════════════════════════════════════════
+        let formData = {};
+        let selectedFactors = new Set();
+        let currentEnv = '';
+        let isStreaming = false;
+
+        // ═══════════════════════════════════════════
+        // DOM REFS
+        // ═══════════════════════════════════════════
+        const envDropdown = document.getElementById('envDropdown');
+        const factorsContainer = document.getElementById('factorsContainer');
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const clearChatBtn = document.getElementById('clearChatBtn');
+        const selectedSummary = document.getElementById('selectedSummary');
+        const selectedList = document.getElementById('selectedList');
+        const selectedCount = document.getElementById('selectedCount');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const clearFactorsBtn = document.getElementById('clearFactorsBtn');
+        const autoSendBtn = document.getElementById('autoSendBtn');
+
+        // ═══════════════════════════════════════════
+        // INIT: Load form data
+        // ═══════════════════════════════════════════
+        async function loadFormData() {
+            try {
+                const res = await fetch('/api/form-data');
+                formData = await res.json();
+                populateDropdown();
+            } catch (err) {
+                console.error('Failed to load form data:', err);
+            }
+        }
+
+        /**
+         * Populate the environment dropdown from loaded form data.
+         */
+        function populateDropdown() {
+            Object.keys(formData).forEach(envName => {
+                const option = document.createElement('option');
+                option.value = envName;
+                option.textContent = envName;
+                envDropdown.appendChild(option);
+            });
+        }
+
+        // ═══════════════════════════════════════════
+        // FORM: Render factors
+        // ═══════════════════════════════════════════
+
+        /**
+         * Handle environment dropdown change — render subsections and factors
+         * with staggered fade-in animation.
+         */
+        envDropdown.addEventListener('change', () => {
+            currentEnv = envDropdown.value;
+            autoSendBtn.disabled = !currentEnv;
+
+            if (!currentEnv || !formData[currentEnv]) {
+                factorsContainer.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📋</div>
+                        <p>Select an environment type above to view and manage factors.</p>
+                    </div>`;
+                return;
+            }
+
+            const subsections = formData[currentEnv];
+            let html = '';
+            let index = 0;
+
+            for (const [subName, factors] of Object.entries(subsections)) {
+                html += `<div class="subsection" style="animation-delay: ${index * 0.08}s">
+                    <h3 class="subsection-title">${getSubsectionIcon(subName)} ${subName}</h3>
+                    <div class="factor-list">`;
+
+                factors.forEach(factor => {
+                    const checked = selectedFactors.has(factor) ? 'checked' : '';
+                    const factorId = `factor-${factor.replace(/[^a-zA-Z0-9]/g, '_')}`;
+                    html += `
+                        <label class="factor-item ${checked ? 'active' : ''}" for="${factorId}">
+                            <input type="checkbox" id="${factorId}" value="${factor}" ${checked}
+                                   onchange="toggleFactor(this)">
+                            <span class="factor-checkbox">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+                            </span>
+                            <span class="factor-text">${factor}</span>
+                        </label>`;
+                });
+
+                html += `</div></div>`;
+                index++;
+            }
+
+            factorsContainer.innerHTML = html;
+        });
+
+        /**
+         * Return an appropriate emoji icon for each subsection type.
+         */
+        function getSubsectionIcon(name) {
+            const lower = name.toLowerCase();
+            if (lower.includes('control')) return '🎛️';
+            if (lower.includes('equipment')) return '⚙️';
+            if (lower.includes('uncontrol')) return '🌦️';
+            if (lower.includes('partial')) return '🔧';
+            if (lower.includes('eu') || lower.includes('constraint')) return '🇪🇺';
+            if (lower.includes('genetic')) return '🧬';
+            if (lower.includes('operational')) return '📊';
+            if (lower.includes('economic')) return '💰';
+            return '📌';
+        }
+
+        /**
+         * Toggle a factor's selected state and update the UI summary.
+         */
+        function toggleFactor(checkbox) {
+            const factor = checkbox.value;
+            const label = checkbox.closest('.factor-item');
+
+            if (checkbox.checked) {
+                selectedFactors.add(factor);
+                label.classList.add('active');
+            } else {
+                selectedFactors.delete(factor);
+                label.classList.remove('active');
+            }
+            updateSelectedSummary();
+        }
+
+        /**
+         * Update the selected factors summary panel at the bottom of the form.
+         */
+        function updateSelectedSummary() {
+            if (selectedFactors.size === 0) {
+                selectedSummary.classList.add('hidden');
+                return;
+            }
+            selectedSummary.classList.remove('hidden');
+            selectedCount.textContent = selectedFactors.size;
+            selectedList.innerHTML = Array.from(selectedFactors)
+                .map(f => `<span class="selected-tag">${f}<button onclick="removeFactor('${f.replace(/'/g, "\\'")}')">×</button></span>`)
+                .join('');
+        }
+
+        /**
+         * Remove a factor from the selected set and update checkbox state.
+         */
+        function removeFactor(factor) {
+            selectedFactors.delete(factor);
+            const cb = document.querySelector(`input[value="${CSS.escape(factor)}"]`);
+            if (cb) {
+                cb.checked = false;
+                cb.closest('.factor-item')?.classList.remove('active');
+            }
+            updateSelectedSummary();
+        }
+
+        /**
+         * Clear all factors and reset dropdown.
+         */
+        clearFactorsBtn.addEventListener('click', () => {
+            envDropdown.value = '';
+            currentEnv = '';
+            autoSendBtn.disabled = true;
+            selectedFactors.clear();
+            factorsContainer.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">📋</div>
+                    <p>Select an environment type above to view and manage factors.</p>
+                </div>`;
+            updateSelectedSummary();
+        });
+
+        /**
+         * Auto-generate a prompt and send it to the chat.
+         */
+        autoSendBtn.addEventListener('click', () => {
+            if (!currentEnv) return;
+            
+            let prompt = `I am researching the ${currentEnv}. `;
+            if (selectedFactors.size > 0) {
+                prompt += `Specifically, I want to optimize the following factors: ${Array.from(selectedFactors).join(', ')}. `;
+            } else {
+                prompt += `What are the most critical factors to consider? `;
+            }
+            prompt += `Please provide insights based on European field conditions.`;
+            
+            messageInput.value = prompt;
+            sendMessage();
+        });
+
+        // ═══════════════════════════════════════════
+        // CHAT: Send & stream
+        // ═══════════════════════════════════════════
+
+        /**
+         * Send the user's message to the GPT-4o chat endpoint,
+         * including the current form context (selected environment + factors).
+         * Streams the response via SSE and renders it incrementally.
+         */
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message || isStreaming) return;
+
+            // Add user message bubble
+            appendMessage('user', message);
+            messageInput.value = '';
+            autoResize(messageInput);
+
+            // Set streaming state
+            isStreaming = true;
+            setStatus('Thinking...', 'streaming');
+
+            // Prepare form context
+            const formContext = {
+                environment: currentEnv,
+                selected_factors: Array.from(selectedFactors)
+            };
+
+            // Create assistant message bubble
+            const assistantDiv = appendMessage('assistant', '', true);
+            const contentDiv = assistantDiv.querySelector('.message-content');
+
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message, form_context: formContext })
+                });
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let fullText = '';
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const payload = line.slice(6);
+
+                        if (payload === '[DONE]') continue;
+
+                        try {
+                            const data = JSON.parse(payload);
+                            if (data.error) {
+                                contentDiv.innerHTML = `<p class="error-text">Error: ${data.error}</p>`;
+                                continue;
+                            }
+                            if (data.content) {
+                                fullText += data.content;
+                                contentDiv.innerHTML = renderMarkdown(fullText);
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            }
+                        } catch (e) { /* skip malformed chunks */ }
+                    }
+                }
+            } catch (err) {
+                contentDiv.innerHTML = `<p class="error-text">Connection error: ${err.message}</p>`;
+            }
+
+            isStreaming = false;
+            setStatus('Ready', 'ready');
+        }
+
+        /**
+         * Append a message bubble to the chat panel.
+         * Returns the message DOM element for streaming updates.
+         */
+        function appendMessage(role, text, streaming = false) {
+            const div = document.createElement('div');
+            div.className = `message ${role} ${streaming ? 'streaming' : ''}`;
+
+            const avatar = role === 'user' ? '👤' : '🌿';
+            div.innerHTML = `
+                <div class="message-avatar">${avatar}</div>
+                <div class="message-content">${text ? renderMarkdown(text) : '<span class="typing-indicator"><span></span><span></span><span></span></span>'}</div>
+            `;
+
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return div;
+        }
+
+        /**
+         * Basic markdown-to-HTML renderer for chat responses.
+         * Handles bold, italic, code blocks, inline code, and lists.
+         */
+        function renderMarkdown(text) {
+            return text
+                .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="lang-$1">$2</code></pre>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+                .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+                .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+                .replace(/^- (.+)$/gm, '<li>$1</li>')
+                .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+                .replace(/<\/ul>\s*<ul>/g, '')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+        }
+
+        /**
+         * Update the status indicator in the header.
+         */
+        function setStatus(text, state) {
+            statusText.textContent = text;
+            statusIndicator.className = `status-indicator ${state}`;
+        }
+
+        // ═══════════════════════════════════════════
+        // INPUT: Auto-resize & key handling
+        // ═══════════════════════════════════════════
+
+        messageInput.addEventListener('input', () => autoResize(messageInput));
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        /**
+         * Auto-resize textarea to fit content, capped at 120px.
+         */
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+
+        clearChatBtn.addEventListener('click', () => {
+            chatMessages.innerHTML = `
+                <div class="message assistant">
+                    <div class="message-avatar">🌿</div>
+                    <div class="message-content">
+                        <p>Chat cleared. Ready for new questions about crop development factors.</p>
+                    </div>
+                </div>`;
+        });
+
+        // ═══════════════════════════════════════════
+        // RESIZE HANDLE
+        // ═══════════════════════════════════════════
+        const resizeHandle = document.getElementById('resizeHandle');
+        let isResizing = false;
+
+        resizeHandle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const container = document.getElementById('split-container');
+            const rect = container.getBoundingClientRect();
+            const pct = ((e.clientX - rect.left) / rect.width) * 100;
+            const clamped = Math.max(25, Math.min(75, pct));
+            document.getElementById('chat-panel').style.flex = `0 0 ${clamped}%`;
+            document.getElementById('form-panel').style.flex = `0 0 ${100 - clamped}%`;
+        });
+
+        document.addEventListener('mouseup', () => {
+            isResizing = false;
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        });
+
+        // ═══════════════════════════════════════════
+        // BOOT
+        // ═══════════════════════════════════════════
+        loadFormData();
+    </script>
+</body>
+</html>

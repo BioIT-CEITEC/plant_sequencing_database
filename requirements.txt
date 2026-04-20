@@ -1,0 +1,6 @@
+python-docx
+openai
+flask
+python-dotenv
+networkx
+# graphify installed separately: pip install git+https://github.com/safishamsi/graphify.git@v4

@@ -11,16 +11,20 @@ env/
 venv/
 ENV/
 
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
 # Data
 *.fastq
 *.fastq.gz
 data/
+
+# Folder
+.agent/
+documents/
+fasta_file/
+graphify-out/
+
+# python file
+knowledge_graph.py
+
+# Markdown files
+FIELD_DERIVABILITY_SUMMARY.md
+QUICK_REFERENCE.md
