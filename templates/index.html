@@ -3,24 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Crop Development Research Assistant — GPT-4o powered chat with dynamic environmental factor analysis for European conditions.">
-    <title>Crop Development Research Assistant</title>
+    <meta name="description" content="Tri-Modal Document Interaction System">
+    <title>Document Research Assistant</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
-    <!-- Header -->
     <header id="app-header">
         <div class="header-left">
-            <div class="logo-icon">🌱</div>
+            <div class="logo-icon">📄</div>
             <div>
-                <h1>Crop Development Assistant</h1>
-                <p class="subtitle">European Conditions Research • GPT-4o Powered</p>
+                <h1>Document Research Assistant</h1>
+                <p class="subtitle">Extract metadata & chat with scientific manuscripts</p>
             </div>
         </div>
         <div class="header-right">
+            <button id="togglePanelBtn" class="btn-ghost hidden" title="Toggle Metadata Panel">
+                📊 View Metadata
+            </button>
             <span class="status-indicator" id="statusIndicator">
                 <span class="status-dot"></span>
                 <span id="statusText">Ready</span>
@@ -28,479 +31,491 @@
         </div>
     </header>
 
-    <!-- Main split-screen container -->
-    <main id="split-container">
-        <!-- LEFT PANEL: Chat -->
-        <section id="chat-panel" class="panel">
-            <div class="panel-header">
-                <h2>💬 Research Chat</h2>
-                <button id="clearChatBtn" class="btn-ghost" title="Clear chat">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                </button>
-            </div>
-
-            <div id="chatMessages" class="chat-messages">
-                <div class="message assistant">
-                    <div class="message-avatar">🌿</div>
+    <main id="chat-container">
+        <!-- Main Chat Area -->
+        <section id="chat-area">
+            <div id="messagesContainer">
+                <div class="message system-message">
                     <div class="message-content">
-                        <p>Welcome! I'm your crop development research assistant, specialized in European field conditions.</p>
-                        <p>Select environmental factors on the right panel, then ask me anything about crop optimization, lab parameters, field conditions, or EU regulations.</p>
+                        Welcome! Please upload a manuscript (PDF, TXT, DOCX) to extract metadata or begin a chat.
                     </div>
                 </div>
             </div>
-
-            <div id="chatInput" class="chat-input-area">
-                <div class="input-wrapper">
-                    <textarea id="messageInput" 
-                              placeholder="Ask about crop development factors..."
-                              rows="1"
-                              maxlength="2000"></textarea>
-                    <button id="sendBtn" class="btn-send" title="Send message">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            
+            <div class="chat-input-wrapper">
+                <div class="chat-input-container">
+                    <button id="attachBtn" class="btn-icon" title="Attach Document">📎</button>
+                    <input type="file" id="fileInput" accept=".pdf,.txt,.docx" hidden>
+                    <input type="text" id="chatInput" placeholder="Type a message or trigger extraction..." autocomplete="off">
+                    <button id="sendBtn" class="btn-icon send-btn" title="Send Message">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
                     </button>
                 </div>
-                <p class="input-hint">Press Enter to send • Shift+Enter for new line</p>
+                <div id="uploadStatus" class="upload-status hidden">
+                    <span class="badge" id="uploadBadge">Uploading...</span>
+                </div>
             </div>
         </section>
 
-        <!-- Resize handle -->
-        <div id="resizeHandle" class="resize-handle" title="Drag to resize">
-            <div class="handle-grip"></div>
-        </div>
-
-        <!-- RIGHT PANEL: Factors Form -->
-        <section id="form-panel" class="panel">
+        <!-- Metadata Side Panel -->
+        <section id="metadata-panel" class="panel hidden">
             <div class="panel-header">
-                <h2>🧪 Environmental Factors</h2>
-                <button id="clearFactorsBtn" class="btn-ghost" title="Clear all factors">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                </button>
+                <h2>📊 Extraction Results</h2>
+                <div class="header-actions">
+                    <button id="expandAllBtn" class="btn-ghost btn-sm">Expand All</button>
+                    <button id="collapseAllBtn" class="btn-ghost btn-sm">Collapse All</button>
+                    <button id="closePanelBtn" class="btn-icon" title="Close Panel" style="margin-left: 10px;">×</button>
+                </div>
             </div>
 
-            <div class="form-content">
-                <!-- Environment selector -->
-                <div class="form-group" style="display: flex; gap: 10px; align-items: flex-end;">
-                    <div style="flex: 1;">
-                        <label for="envDropdown" class="form-label">Environment Type</label>
-                        <div class="select-wrapper">
-                            <select id="envDropdown" class="form-select">
-                                <option value="">— Select Environment —</option>
-                            </select>
+            <div id="resultsContainer" class="results-container">
+                <div id="metadataContent" class="metadata-content">
+                    <div class="summary-stats">
+                        <div class="stat">
+                            <span class="stat-value" id="statExtracted">0</span>
+                            <span class="stat-label">Extracted</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value muted" id="statNull">0</span>
+                            <span class="stat-label">Missing (null)</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-value" id="statTotal">0</span>
+                            <span class="stat-label">Total Fields</span>
                         </div>
                     </div>
-                    <button id="autoSendBtn" class="btn-send" title="Auto-generate prompt" style="width: 44px; height: 44px; flex-shrink: 0;" disabled>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                    <div id="groupsContainer"></div>
+                </div>
+                <div class="panel-footer" style="padding: 1rem; border-top: 1px solid var(--border);">
+                    <button id="downloadBtn" class="btn-ghost w-100" title="Download JSON">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                        Download JSON
                     </button>
-                </div>
-
-                <!-- Dynamic subsections -->
-                <div id="factorsContainer" class="factors-container">
-                    <div class="empty-state">
-                        <div class="empty-icon">📋</div>
-                        <p>Select an environment type above to view and manage factors.</p>
-                    </div>
-                </div>
-
-                <!-- Selected factors summary -->
-                <div id="selectedSummary" class="selected-summary hidden">
-                    <div class="summary-header">
-                        <h3>Selected Factors</h3>
-                        <span id="selectedCount" class="badge">0</span>
-                    </div>
-                    <div id="selectedList" class="selected-list"></div>
                 </div>
             </div>
         </section>
     </main>
 
     <script>
-        // ═══════════════════════════════════════════
-        // STATE
-        // ═══════════════════════════════════════════
-        let formData = {};
-        let selectedFactors = new Set();
-        let currentEnv = '';
-        let isStreaming = false;
-
-        // ═══════════════════════════════════════════
-        // DOM REFS
-        // ═══════════════════════════════════════════
-        const envDropdown = document.getElementById('envDropdown');
-        const factorsContainer = document.getElementById('factorsContainer');
-        const chatMessages = document.getElementById('chatMessages');
-        const messageInput = document.getElementById('messageInput');
+        const attachBtn = document.getElementById('attachBtn');
+        const fileInput = document.getElementById('fileInput');
+        const chatInput = document.getElementById('chatInput');
         const sendBtn = document.getElementById('sendBtn');
-        const clearChatBtn = document.getElementById('clearChatBtn');
-        const selectedSummary = document.getElementById('selectedSummary');
-        const selectedList = document.getElementById('selectedList');
-        const selectedCount = document.getElementById('selectedCount');
-        const statusIndicator = document.getElementById('statusIndicator');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const uploadBadge = document.getElementById('uploadBadge');
+        
+        const metadataPanel = document.getElementById('metadata-panel');
+        const togglePanelBtn = document.getElementById('togglePanelBtn');
+        const closePanelBtn = document.getElementById('closePanelBtn');
+        const groupsContainer = document.getElementById('groupsContainer');
+        
+        const statExtracted = document.getElementById('statExtracted');
+        const statNull = document.getElementById('statNull');
+        const statTotal = document.getElementById('statTotal');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
         const statusText = document.getElementById('statusText');
-        const clearFactorsBtn = document.getElementById('clearFactorsBtn');
-        const autoSendBtn = document.getElementById('autoSendBtn');
+        const statusIndicator = document.getElementById('statusIndicator');
 
-        // ═══════════════════════════════════════════
-        // INIT: Load form data
-        // ═══════════════════════════════════════════
-        async function loadFormData() {
+        let schemaData = null;
+        let extractedMetadata = null;
+        let isProcessing = false;
+
+        async function init() {
             try {
-                const res = await fetch('/api/form-data');
-                formData = await res.json();
-                populateDropdown();
+                const res = await fetch('/api/schema');
+                schemaData = await res.json();
             } catch (err) {
-                console.error('Failed to load form data:', err);
+                console.error("Failed to load schema", err);
             }
         }
 
-        /**
-         * Populate the environment dropdown from loaded form data.
-         */
-        function populateDropdown() {
-            Object.keys(formData).forEach(envName => {
-                const option = document.createElement('option');
-                option.value = envName;
-                option.textContent = envName;
-                envDropdown.appendChild(option);
-            });
-        }
+        attachBtn.addEventListener('click', () => fileInput.click());
 
-        // ═══════════════════════════════════════════
-        // FORM: Render factors
-        // ═══════════════════════════════════════════
-
-        /**
-         * Handle environment dropdown change — render subsections and factors
-         * with staggered fade-in animation.
-         */
-        envDropdown.addEventListener('change', () => {
-            currentEnv = envDropdown.value;
-            autoSendBtn.disabled = !currentEnv;
-
-            if (!currentEnv || !formData[currentEnv]) {
-                factorsContainer.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-icon">📋</div>
-                        <p>Select an environment type above to view and manage factors.</p>
-                    </div>`;
-                return;
+        fileInput.addEventListener('change', async function() {
+            if (this.files && this.files.length) {
+                const file = this.files[0];
+                await uploadFile(file);
+                
+                // If there's no chat message, auto-trigger extraction
+                if (!chatInput.value.trim()) {
+                    sendMessage("Extract metadata", true);
+                }
+                
+                this.value = ''; // Reset input
             }
+        });
 
-            const subsections = formData[currentEnv];
-            let html = '';
-            let index = 0;
+        async function uploadFile(file) {
+            addSystemMessage(`📄 Uploading: ${file.name} (${(file.size / (1024*1024)).toFixed(2)} MB)...`);
+            uploadStatus.classList.remove('hidden');
+            uploadBadge.textContent = 'Uploading...';
+            
+            const formData = new FormData();
+            formData.append('file', file);
 
-            for (const [subName, factors] of Object.entries(subsections)) {
-                html += `<div class="subsection" style="animation-delay: ${index * 0.08}s">
-                    <h3 class="subsection-title">${getSubsectionIcon(subName)} ${subName}</h3>
-                    <div class="factor-list">`;
-
-                factors.forEach(factor => {
-                    const checked = selectedFactors.has(factor) ? 'checked' : '';
-                    const factorId = `factor-${factor.replace(/[^a-zA-Z0-9]/g, '_')}`;
-                    html += `
-                        <label class="factor-item ${checked ? 'active' : ''}" for="${factorId}">
-                            <input type="checkbox" id="${factorId}" value="${factor}" ${checked}
-                                   onchange="toggleFactor(this)">
-                            <span class="factor-checkbox">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
-                            </span>
-                            <span class="factor-text">${factor}</span>
-                        </label>`;
+            try {
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
                 });
-
-                html += `</div></div>`;
-                index++;
+                const data = await res.json();
+                
+                if (res.ok) {
+                    addSystemMessage(`✅ Document successfully processed and indexed into ${data.chunk_count} chunks.`);
+                    uploadBadge.textContent = 'Ready';
+                    setTimeout(() => uploadStatus.classList.add('hidden'), 2000);
+                    
+                    // Clear previous metadata
+                    extractedMetadata = null;
+                    groupsContainer.innerHTML = '';
+                    updateStats();
+                    metadataPanel.classList.add('hidden');
+                    togglePanelBtn.classList.add('hidden');
+                } else {
+                    addSystemMessage(`❌ Error: ${data.error}`);
+                    uploadStatus.classList.add('hidden');
+                }
+            } catch (err) {
+                addSystemMessage(`❌ Upload failed: ${err.message}`);
+                uploadStatus.classList.add('hidden');
             }
+        }
 
-            factorsContainer.innerHTML = html;
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !isProcessing) {
+                sendMessage(chatInput.value);
+            }
         });
 
-        /**
-         * Return an appropriate emoji icon for each subsection type.
-         */
-        function getSubsectionIcon(name) {
-            const lower = name.toLowerCase();
-            if (lower.includes('control')) return '🎛️';
-            if (lower.includes('equipment')) return '⚙️';
-            if (lower.includes('uncontrol')) return '🌦️';
-            if (lower.includes('partial')) return '🔧';
-            if (lower.includes('eu') || lower.includes('constraint')) return '🇪🇺';
-            if (lower.includes('genetic')) return '🧬';
-            if (lower.includes('operational')) return '📊';
-            if (lower.includes('economic')) return '💰';
-            return '📌';
-        }
-
-        /**
-         * Toggle a factor's selected state and update the UI summary.
-         */
-        function toggleFactor(checkbox) {
-            const factor = checkbox.value;
-            const label = checkbox.closest('.factor-item');
-
-            if (checkbox.checked) {
-                selectedFactors.add(factor);
-                label.classList.add('active');
-            } else {
-                selectedFactors.delete(factor);
-                label.classList.remove('active');
+        sendBtn.addEventListener('click', () => {
+            if (!isProcessing) {
+                sendMessage(chatInput.value);
             }
-            updateSelectedSummary();
-        }
-
-        /**
-         * Update the selected factors summary panel at the bottom of the form.
-         */
-        function updateSelectedSummary() {
-            if (selectedFactors.size === 0) {
-                selectedSummary.classList.add('hidden');
-                return;
-            }
-            selectedSummary.classList.remove('hidden');
-            selectedCount.textContent = selectedFactors.size;
-            selectedList.innerHTML = Array.from(selectedFactors)
-                .map(f => `<span class="selected-tag">${f}<button onclick="removeFactor('${f.replace(/'/g, "\\'")}')">×</button></span>`)
-                .join('');
-        }
-
-        /**
-         * Remove a factor from the selected set and update checkbox state.
-         */
-        function removeFactor(factor) {
-            selectedFactors.delete(factor);
-            const cb = document.querySelector(`input[value="${CSS.escape(factor)}"]`);
-            if (cb) {
-                cb.checked = false;
-                cb.closest('.factor-item')?.classList.remove('active');
-            }
-            updateSelectedSummary();
-        }
-
-        /**
-         * Clear all factors and reset dropdown.
-         */
-        clearFactorsBtn.addEventListener('click', () => {
-            envDropdown.value = '';
-            currentEnv = '';
-            autoSendBtn.disabled = true;
-            selectedFactors.clear();
-            factorsContainer.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-icon">📋</div>
-                    <p>Select an environment type above to view and manage factors.</p>
-                </div>`;
-            updateSelectedSummary();
         });
 
-        /**
-         * Auto-generate a prompt and send it to the chat.
-         */
-        autoSendBtn.addEventListener('click', () => {
-            if (!currentEnv) return;
-            
-            let prompt = `I am researching the ${currentEnv}. `;
-            if (selectedFactors.size > 0) {
-                prompt += `Specifically, I want to optimize the following factors: ${Array.from(selectedFactors).join(', ')}. `;
-            } else {
-                prompt += `What are the most critical factors to consider? `;
+        async function sendMessage(msg, triggerExtraction = false) {
+            const text = msg.trim();
+            if (!text && !triggerExtraction) return;
+
+            if (!triggerExtraction) {
+                addUserMessage(text);
+                chatInput.value = '';
             }
-            prompt += `Please provide insights based on European field conditions.`;
-            
-            messageInput.value = prompt;
-            sendMessage();
-        });
 
-        // ═══════════════════════════════════════════
-        // CHAT: Send & stream
-        // ═══════════════════════════════════════════
+            isProcessing = true;
+            statusText.textContent = "Processing...";
+            statusIndicator.classList.add("processing");
+            chatInput.disabled = true;
+            sendBtn.disabled = true;
 
-        /**
-         * Send the user's message to the GPT-4o chat endpoint,
-         * including the current form context (selected environment + factors).
-         * Streams the response via SSE and renders it incrementally.
-         */
-        async function sendMessage() {
-            const message = messageInput.value.trim();
-            if (!message || isStreaming) return;
-
-            // Add user message bubble
-            appendMessage('user', message);
-            messageInput.value = '';
-            autoResize(messageInput);
-
-            // Set streaming state
-            isStreaming = true;
-            setStatus('Thinking...', 'streaming');
-
-            // Prepare form context
-            const formContext = {
-                environment: currentEnv,
-                selected_factors: Array.from(selectedFactors)
-            };
-
-            // Create assistant message bubble
-            const assistantDiv = appendMessage('assistant', '', true);
-            const contentDiv = assistantDiv.querySelector('.message-content');
+            const assistantMsgElem = createAssistantMessageElem();
 
             try {
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message, form_context: formContext })
+                    body: JSON.stringify({ message: text, trigger_extraction: triggerExtraction })
                 });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    assistantMsgElem.innerHTML = `<span style="color: #ff6b6b">Error: ${data.error}</span>`;
+                    scrollToBottom();
+                    setReady();
+                    return;
+                }
 
                 const reader = res.body.getReader();
                 const decoder = new TextDecoder();
-                let fullText = '';
-                let buffer = '';
+                let fullContent = "";
+                let currentMode = "";
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop();
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
 
                     for (const line of lines) {
-                        if (!line.startsWith('data: ')) continue;
-                        const payload = line.slice(6);
-
-                        if (payload === '[DONE]') continue;
-
-                        try {
-                            const data = JSON.parse(payload);
-                            if (data.error) {
-                                contentDiv.innerHTML = `<p class="error-text">Error: ${data.error}</p>`;
+                        if (line.startsWith('data: ')) {
+                            const dataStr = line.replace('data: ', '').trim();
+                            if (dataStr === '[DONE]') {
                                 continue;
                             }
-                            if (data.content) {
-                                fullText += data.content;
-                                contentDiv.innerHTML = renderMarkdown(fullText);
-                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            try {
+                                const dataObj = JSON.parse(dataStr);
+                                if (dataObj.error) {
+                                    assistantMsgElem.innerHTML += `<span style="color: #ff6b6b">Error: ${dataObj.error}</span>`;
+                                    continue;
+                                }
+                                if (dataObj.content) {
+                                    fullContent += dataObj.content;
+                                    currentMode = dataObj.mode;
+                                    
+                                    if (currentMode === 'extraction') {
+                                        assistantMsgElem.innerHTML = `<span style="color: var(--text-muted)">Extracting metadata...</span>`;
+                                    } else {
+                                        assistantMsgElem.innerHTML = marked.parse(fullContent);
+                                    }
+                                    scrollToBottom();
+                                }
+                            } catch (e) {
+                                console.error('Parse error', e, dataStr);
                             }
-                        } catch (e) { /* skip malformed chunks */ }
+                        }
                     }
                 }
+                
+                if (currentMode === 'extraction') {
+                    assistantMsgElem.innerHTML = `✅ Metadata extraction complete. <a href="#" onclick="togglePanelBtn.click(); return false;" style="color: var(--primary);">View Results</a>`;
+                    try {
+                        extractedMetadata = JSON.parse(fullContent);
+                        renderMetadata(extractedMetadata);
+                        togglePanelBtn.classList.remove('hidden');
+                        if (!triggerExtraction) {
+                            togglePanel();
+                        } else {
+                            // If auto-triggered on upload, open panel by default
+                            metadataPanel.classList.remove('hidden');
+                        }
+                    } catch (e) {
+                        assistantMsgElem.innerHTML = `<span style="color: #ff6b6b">Error parsing extraction JSON</span>`;
+                    }
+                } else if (currentMode === 'hybrid') {
+                    // Prepend mode badge
+                    assistantMsgElem.innerHTML = `<div class="mode-badge hybrid-badge">Hybrid Mode</div>` + marked.parse(fullContent);
+                } else if (currentMode === 'interaction') {
+                    assistantMsgElem.innerHTML = `<div class="mode-badge interaction-badge">Document Q&A</div>` + marked.parse(fullContent);
+                }
+
             } catch (err) {
-                contentDiv.innerHTML = `<p class="error-text">Connection error: ${err.message}</p>`;
+                assistantMsgElem.innerHTML = `<span style="color: #ff6b6b">Request failed: ${err.message}</span>`;
             }
-
-            isStreaming = false;
-            setStatus('Ready', 'ready');
+            
+            setReady();
+        }
+        
+        function setReady() {
+            isProcessing = false;
+            statusText.textContent = "Ready";
+            statusIndicator.classList.remove("processing");
+            chatInput.disabled = false;
+            sendBtn.disabled = false;
+            chatInput.focus();
+            scrollToBottom();
         }
 
-        /**
-         * Append a message bubble to the chat panel.
-         * Returns the message DOM element for streaming updates.
-         */
-        function appendMessage(role, text, streaming = false) {
-            const div = document.createElement('div');
-            div.className = `message ${role} ${streaming ? 'streaming' : ''}`;
-
-            const avatar = role === 'user' ? '👤' : '🌿';
-            div.innerHTML = `
-                <div class="message-avatar">${avatar}</div>
-                <div class="message-content">${text ? renderMarkdown(text) : '<span class="typing-indicator"><span></span><span></span><span></span></span>'}</div>
-            `;
-
-            chatMessages.appendChild(div);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            return div;
+        function addUserMessage(text) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message user-message';
+            const content = document.createElement('div');
+            content.className = 'message-content';
+            content.textContent = text;
+            wrapper.appendChild(content);
+            messagesContainer.appendChild(wrapper);
+            scrollToBottom();
         }
 
-        /**
-         * Basic markdown-to-HTML renderer for chat responses.
-         * Handles bold, italic, code blocks, inline code, and lists.
-         */
-        function renderMarkdown(text) {
-            return text
-                .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code class="lang-$1">$2</code></pre>')
-                .replace(/`([^`]+)`/g, '<code>$1</code>')
-                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                .replace(/^### (.+)$/gm, '<h4>$1</h4>')
-                .replace(/^## (.+)$/gm, '<h3>$1</h3>')
-                .replace(/^# (.+)$/gm, '<h2>$1</h2>')
-                .replace(/^- (.+)$/gm, '<li>$1</li>')
-                .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
-                .replace(/<\/ul>\s*<ul>/g, '')
-                .replace(/\n\n/g, '</p><p>')
-                .replace(/\n/g, '<br>');
+        function createAssistantMessageElem() {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message assistant-message';
+            const content = document.createElement('div');
+            content.className = 'message-content typing-indicator-container';
+            content.innerHTML = `<div class="typing-indicator"><span></span><span></span><span></span></div>`;
+            wrapper.appendChild(content);
+            messagesContainer.appendChild(wrapper);
+            scrollToBottom();
+            return content;
         }
 
-        /**
-         * Update the status indicator in the header.
-         */
-        function setStatus(text, state) {
-            statusText.textContent = text;
-            statusIndicator.className = `status-indicator ${state}`;
+        function addSystemMessage(text) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'message system-message';
+            const content = document.createElement('div');
+            content.className = 'message-content';
+            content.textContent = text;
+            wrapper.appendChild(content);
+            messagesContainer.appendChild(wrapper);
+            scrollToBottom();
         }
 
-        // ═══════════════════════════════════════════
-        // INPUT: Auto-resize & key handling
-        // ═══════════════════════════════════════════
-
-        messageInput.addEventListener('input', () => autoResize(messageInput));
-        messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        /**
-         * Auto-resize textarea to fit content, capped at 120px.
-         */
-        function autoResize(el) {
-            el.style.height = 'auto';
-            el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+        function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        sendBtn.addEventListener('click', sendMessage);
+        // Side Panel Toggle
+        togglePanelBtn.addEventListener('click', togglePanel);
+        closePanelBtn.addEventListener('click', togglePanel);
 
-        clearChatBtn.addEventListener('click', () => {
-            chatMessages.innerHTML = `
-                <div class="message assistant">
-                    <div class="message-avatar">🌿</div>
-                    <div class="message-content">
-                        <p>Chat cleared. Ready for new questions about crop development factors.</p>
+        function togglePanel() {
+            metadataPanel.classList.toggle('hidden');
+        }
+
+        // --- Metadata Rendering Logic ---
+        function renderMetadata(data) {
+            groupsContainer.innerHTML = '';
+            let extractedCount = 0;
+            let nullCount = 0;
+            let totalCount = 0;
+
+            if (!schemaData) return;
+
+            for (const [groupName, schemaGroup] of Object.entries(schemaData)) {
+                if (!data[groupName]) continue;
+                
+                const groupData = data[groupName];
+                const groupElem = document.createElement('div');
+                groupElem.className = 'metadata-group';
+
+                const headerElem = document.createElement('div');
+                headerElem.className = 'group-header';
+                
+                let groupFilled = 0;
+                let groupTotal = Object.keys(schemaGroup.properties || {}).length;
+                totalCount += groupTotal;
+
+                for (const key of Object.keys(schemaGroup.properties || {})) {
+                    const fieldVal = groupData[key];
+                    if (fieldVal && fieldVal.value !== null) {
+                        groupFilled++;
+                        extractedCount++;
+                    } else {
+                        nullCount++;
+                    }
+                }
+
+                headerElem.innerHTML = `
+                    <div class="group-title">
+                        <span class="chevron">▼</span>
+                        ${groupName}
                     </div>
-                </div>`;
+                    <div class="group-stats">
+                        ${groupFilled}/${groupTotal}
+                    </div>
+                `;
+
+                const fieldsContainer = document.createElement('div');
+                fieldsContainer.className = 'group-fields';
+
+                for (const [fieldKey, fieldSchema] of Object.entries(schemaGroup.properties || {})) {
+                    const fieldData = groupData[fieldKey];
+                    
+                    const fieldElem = document.createElement('div');
+                    fieldElem.className = 'field-row';
+                    
+                    const nameElem = document.createElement('div');
+                    nameElem.className = 'field-name';
+                    nameElem.textContent = fieldKey;
+                    nameElem.title = fieldSchema.description || "";
+                    
+                    const valElem = document.createElement('div');
+                    valElem.className = 'field-value';
+                    
+                    if (!fieldData || fieldData.value === null) {
+                        valElem.classList.add('null-value');
+                        valElem.textContent = 'null';
+                    } else {
+                        valElem.textContent = typeof fieldData.value === 'object' ? JSON.stringify(fieldData.value) : fieldData.value;
+                        
+                        if (fieldData.confidence) {
+                            const confBadge = document.createElement('span');
+                            confBadge.className = 'confidence-badge';
+                            confBadge.textContent = fieldData.confidence;
+                            
+                            const cLower = fieldData.confidence.toLowerCase();
+                            if (cLower === 'high') confBadge.classList.add('conf-high');
+                            else if (cLower === 'medium') confBadge.classList.add('conf-med');
+                            else confBadge.classList.add('conf-low');
+                            
+                            valElem.appendChild(confBadge);
+                        }
+                        
+                        if (fieldData.evidence) {
+                            const evButton = document.createElement('button');
+                            evButton.className = 'btn-ghost btn-sm evidence-toggle';
+                            evButton.innerHTML = '🔍';
+                            evButton.title = 'View evidence';
+                            
+                            const evPanel = document.createElement('div');
+                            evPanel.className = 'evidence-panel hidden';
+                            evPanel.innerHTML = `<strong>Evidence:</strong> "${fieldData.evidence}"<br>
+                                                 <small>Section: ${fieldData.section || 'Unknown'} | Type: ${fieldData.inference_type || 'Unknown'}</small>`;
+                            
+                            evButton.onclick = () => evPanel.classList.toggle('hidden');
+                            
+                            const wrap = document.createElement('div');
+                            wrap.style.display = 'inline-flex';
+                            wrap.style.flexDirection = 'column';
+                            wrap.appendChild(valElem.cloneNode(true));
+                            const flexRow = document.createElement('div');
+                            flexRow.style.display = 'flex';
+                            flexRow.style.alignItems = 'center';
+                            flexRow.style.gap = '8px';
+                            flexRow.appendChild(wrap.firstChild);
+                            flexRow.appendChild(evButton);
+                            
+                            valElem.innerHTML = '';
+                            valElem.appendChild(flexRow);
+                            valElem.appendChild(evPanel);
+                        }
+                    }
+                    
+                    fieldElem.appendChild(nameElem);
+                    fieldElem.appendChild(valElem);
+                    fieldsContainer.appendChild(fieldElem);
+                }
+
+                headerElem.onclick = () => {
+                    const chevron = headerElem.querySelector('.chevron');
+                    if (fieldsContainer.style.display === 'none') {
+                        fieldsContainer.style.display = 'block';
+                        chevron.style.transform = 'rotate(0deg)';
+                    } else {
+                        fieldsContainer.style.display = 'none';
+                        chevron.style.transform = 'rotate(-90deg)';
+                    }
+                };
+
+                groupElem.appendChild(headerElem);
+                groupElem.appendChild(fieldsContainer);
+                groupsContainer.appendChild(groupElem);
+            }
+            
+            updateStats(extractedCount, nullCount, totalCount);
+        }
+        
+        function updateStats(ext = 0, nul = 0, tot = 0) {
+            statExtracted.textContent = ext;
+            statNull.textContent = nul;
+            statTotal.textContent = tot;
+        }
+
+        document.getElementById('expandAllBtn').addEventListener('click', () => {
+            document.querySelectorAll('.group-fields').forEach(el => el.style.display = 'block');
+            document.querySelectorAll('.chevron').forEach(el => el.style.transform = 'rotate(0deg)');
+        });
+        
+        document.getElementById('collapseAllBtn').addEventListener('click', () => {
+            document.querySelectorAll('.group-fields').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.chevron').forEach(el => el.style.transform = 'rotate(-90deg)');
         });
 
-        // ═══════════════════════════════════════════
-        // RESIZE HANDLE
-        // ═══════════════════════════════════════════
-        const resizeHandle = document.getElementById('resizeHandle');
-        let isResizing = false;
-
-        resizeHandle.addEventListener('mousedown', (e) => {
-            isResizing = true;
-            document.body.style.cursor = 'col-resize';
-            document.body.style.userSelect = 'none';
+        downloadBtn.addEventListener('click', () => {
+            if (!extractedMetadata) return;
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(extractedMetadata, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "extracted_metadata.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
         });
 
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizing) return;
-            const container = document.getElementById('split-container');
-            const rect = container.getBoundingClientRect();
-            const pct = ((e.clientX - rect.left) / rect.width) * 100;
-            const clamped = Math.max(25, Math.min(75, pct));
-            document.getElementById('chat-panel').style.flex = `0 0 ${clamped}%`;
-            document.getElementById('form-panel').style.flex = `0 0 ${100 - clamped}%`;
-        });
-
-        document.addEventListener('mouseup', () => {
-            isResizing = false;
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
-        });
-
-        // ═══════════════════════════════════════════
-        // BOOT
-        // ═══════════════════════════════════════════
-        loadFormData();
+        // Init
+        init();
     </script>
 </body>
 </html>

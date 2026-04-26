@@ -28,3 +28,7 @@ knowledge_graph.py
 # Markdown files
 FIELD_DERIVABILITY_SUMMARY.md
 QUICK_REFERENCE.md
+
+# Unnecessary folders
+flask_session
+vector_store
