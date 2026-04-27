@@ -251,13 +251,16 @@
                                     assistantMsgElem.innerHTML += `<span style="color: #ff6b6b">Error: ${dataObj.error}</span>`;
                                     continue;
                                 }
+                                if (dataObj.status === 'extracting') {
+                                    currentMode = dataObj.mode || 'extraction';
+                                    assistantMsgElem.innerHTML = `<span style="color: var(--text-muted)">Extracting metadata...</span>`;
+                                    continue;
+                                }
                                 if (dataObj.content) {
                                     fullContent += dataObj.content;
                                     currentMode = dataObj.mode;
                                     
-                                    if (currentMode === 'extraction') {
-                                        assistantMsgElem.innerHTML = `<span style="color: var(--text-muted)">Extracting metadata...</span>`;
-                                    } else {
+                                    if (currentMode !== 'extraction') {
                                         assistantMsgElem.innerHTML = marked.parse(fullContent);
                                     }
                                     scrollToBottom();
@@ -272,7 +275,7 @@
                 if (currentMode === 'extraction') {
                     assistantMsgElem.innerHTML = `✅ Metadata extraction complete. <a href="#" onclick="togglePanelBtn.click(); return false;" style="color: var(--primary);">View Results</a>`;
                     try {
-                        extractedMetadata = JSON.parse(fullContent);
+                        extractedMetadata = JSON.parse(fullContent.trim());
                         renderMetadata(extractedMetadata);
                         togglePanelBtn.classList.remove('hidden');
                         if (!triggerExtraction) {
@@ -374,10 +377,10 @@
                 headerElem.className = 'group-header';
                 
                 let groupFilled = 0;
-                let groupTotal = Object.keys(schemaGroup.properties || {}).length;
+                let groupTotal = Object.keys(schemaGroup.fields || {}).length;
                 totalCount += groupTotal;
 
-                for (const key of Object.keys(schemaGroup.properties || {})) {
+                for (const key of Object.keys(schemaGroup.fields || {})) {
                     const fieldVal = groupData[key];
                     if (fieldVal && fieldVal.value !== null) {
                         groupFilled++;
@@ -400,7 +403,7 @@
                 const fieldsContainer = document.createElement('div');
                 fieldsContainer.className = 'group-fields';
 
-                for (const [fieldKey, fieldSchema] of Object.entries(schemaGroup.properties || {})) {
+                for (const [fieldKey, fieldSchema] of Object.entries(schemaGroup.fields || {})) {
                     const fieldData = groupData[fieldKey];
                     
                     const fieldElem = document.createElement('div');

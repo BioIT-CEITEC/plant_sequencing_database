@@ -5,6 +5,7 @@ Uses ChromaDB and OpenAI text-embedding-3-small.
 """
 import os
 import re
+import json
 import tiktoken
 import chromadb
 from chromadb.utils import embedding_functions
@@ -153,3 +154,99 @@ def clear_session(session_id: str):
         chroma_client.delete_collection(name=f"session_{session_id}")
     except Exception:
         pass
+
+def build_schema_index(schema_data, skill_text):
+    """
+    Build a semantic index of schema field groups to determine relevance.
+    """
+    collection = chroma_client.get_or_create_collection(
+        name="schema_fields",
+        embedding_function=openai_ef
+    )
+    
+    # Simple check if already built (in prod, use hash checking)
+    if collection.count() > 0:
+        return
+        
+    lines = skill_text.split('\n')
+    guidance_map = {}
+    for line in lines:
+        if line.startswith('| `'):
+            parts = [p.strip() for p in line.split('|')]
+            if len(parts) >= 5:
+                fname = parts[1].replace("`", "").strip()
+                guidance = parts[4]
+                guidance_map[fname] = guidance
+                
+    documents = []
+    metadatas = []
+    ids = []
+    
+    for i, group in enumerate(schema_data.get("field_groups", [])):
+        group_name = group["group_name"]
+        
+        for field in group.get("fields", []):
+            fname = field["name"]
+            ftype = field.get("field_type")
+            guidance = guidance_map.get(fname, "")
+            
+            # Create a rich description for embedding
+            text_repr = f"Group: {group_name} | Field: {fname} | Type: {ftype} | Guidance: {guidance}"
+            if "text_values" in field and field["text_values"]:
+                text_repr += f" | Values: {', '.join(field['text_values'][:10])}"
+                
+            documents.append(text_repr)
+            metadatas.append({"group_name": group_name, "field_name": fname})
+            ids.append(f"schema_{fname}")
+            
+    if documents:
+        collection.add(documents=documents, metadatas=metadatas, ids=ids)
+
+def score_field_relevance(session_id: str, schema_data) -> list[str]:
+    """
+    Query the document chunks against the schema index to find relevant field groups.
+    Returns a list of relevant group names.
+    """
+    try:
+        doc_collection = chroma_client.get_collection(
+            name=f"session_{session_id}",
+            embedding_function=openai_ef
+        )
+        schema_collection = chroma_client.get_collection(
+            name="schema_fields",
+            embedding_function=openai_ef
+        )
+    except Exception:
+        return [g["group_name"] for g in schema_data.get("field_groups", [])]
+
+    # Get a sample of document chunks (up to 20) to find what it's about
+    docs = doc_collection.get(limit=20)
+    if not docs or not docs['documents']:
+        return [g["group_name"] for g in schema_data.get("field_groups", [])]
+
+    # Combine document chunks into a single large query (or a few)
+    query_text = " ".join(docs['documents'])[:8000] # truncate to avoid token limits
+    
+    # Ask schema collection which fields match this document
+    results = schema_collection.query(
+        query_texts=[query_text],
+        n_results=15  # Get top 15 most relevant fields
+    )
+    
+    if not results['metadatas'] or not results['metadatas'][0]:
+        return [g["group_name"] for g in schema_data.get("field_groups", [])]
+        
+    relevant_groups = set()
+    for meta in results['metadatas'][0]:
+        relevant_groups.add(meta['group_name'])
+        
+    return list(relevant_groups)
+
+def retrieve_evidence(session_id: str, field_names: list[str], top_k: int = 5) -> list[str]:
+    """
+    Retrieve top_k chunks for a specific group of fields.
+    """
+    query = ", ".join(field_names)
+    chunks = query_chunks(session_id, query, top_k)
+    return [c["text"] for c in chunks]
+
