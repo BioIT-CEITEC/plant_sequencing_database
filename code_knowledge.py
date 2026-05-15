@@ -1,3 +1,17 @@
+"""
+code_knowledge.py — Structural code graph for CODEBASE navigation only.
+
+PURPOSE:
+  - Map functions, classes, methods, and import relationships
+  - Support dependency understanding and code navigation
+
+NOT FOR:
+  - Document retrieval (use retrieval_engine.py → ChromaDB)
+  - Metadata extraction (use extract_from_response() in app.py)
+  - User-facing queries (use /api/chat endpoint)
+
+This module has NO runtime connection to the document pipeline.
+"""
 import os
 import json
 import glob
@@ -31,7 +45,8 @@ def build_structural_graph(project_root):
         with open(file_path, "r", encoding="utf-8") as f:
             code_str = f.read()
             
-        tree = parser.parse(bytes(code_str, "utf8"))
+        code_bytes = bytes(code_str, "utf8")
+        tree = parser.parse(code_bytes)
         root_node = tree.root_node
         
         # Simple extraction logic for functions and classes
@@ -41,7 +56,8 @@ def build_structural_graph(project_root):
             if node.type == 'function_definition':
                 name_node = node.child_by_field_name('name')
                 if name_node:
-                    func_name = code_str[name_node.start_byte:name_node.end_byte]
+                    func_name = code_bytes[name_node.start_byte:name_node.end_byte].decode("utf8")
+                    func_name = func_name.split('(')[0].strip()
                     node_id = f"{rel_path}:{func_name}"
                     graph["nodes"][node_id] = {
                         "type": "function",
@@ -54,7 +70,8 @@ def build_structural_graph(project_root):
             elif node.type == 'class_definition':
                 name_node = node.child_by_field_name('name')
                 if name_node:
-                    class_name = code_str[name_node.start_byte:name_node.end_byte]
+                    class_name = code_bytes[name_node.start_byte:name_node.end_byte].decode("utf8")
+                    class_name = class_name.split('(')[0].strip()
                     node_id = f"{rel_path}:{class_name}"
                     graph["nodes"][node_id] = {
                         "type": "class",
@@ -71,7 +88,8 @@ def build_structural_graph(project_root):
                             if child.type == 'function_definition':
                                 method_name_node = child.child_by_field_name('name')
                                 if method_name_node:
-                                    method_name = code_str[method_name_node.start_byte:method_name_node.end_byte]
+                                    method_name = code_bytes[method_name_node.start_byte:method_name_node.end_byte].decode("utf8")
+                                    method_name = method_name.split('(')[0].strip()
                                     method_id = f"{rel_path}:{class_name}.{method_name}"
                                     graph["nodes"][method_id] = {
                                         "type": "method",
@@ -82,13 +100,24 @@ def build_structural_graph(project_root):
                                         "end_line": child.end_point[0]
                                     }
                                     
-            elif node.type == 'import_statement' or node.type == 'import_from_statement':
-                # Simplified import recording
-                graph["edges"].append({
-                    "source": rel_path,
-                    "target": "external_or_internal_module",
-                    "type": "imports"
-                })
+            elif node.type == 'import_statement':
+                for child in node.children:
+                    if child.type == 'dotted_name':
+                        module_name = code_bytes[child.start_byte:child.end_byte].decode("utf8")
+                        graph["edges"].append({
+                            "source": rel_path,
+                            "target": module_name,
+                            "type": "imports"
+                        })
+            elif node.type == 'import_from_statement':
+                module_node = node.child_by_field_name('module_name')
+                if module_node:
+                    module_name = code_bytes[module_node.start_byte:module_node.end_byte].decode("utf8")
+                    graph["edges"].append({
+                        "source": rel_path,
+                        "target": module_name,
+                        "type": "imports_from"
+                    })
                 
     return graph
 

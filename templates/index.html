@@ -21,8 +21,9 @@
             </div>
         </div>
         <div class="header-right">
-            <button id="togglePanelBtn" class="btn-ghost hidden" title="Toggle Metadata Panel">
-                📊 View Metadata
+            <button id="togglePanelBtn" class="btn-ghost" title="Toggle Metadata Panel">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19V5l-7 7 7 7zM15 19V5l7 7-7 7z"/></svg>
+                Metadata
             </button>
             <span class="status-indicator" id="statusIndicator">
                 <span class="status-dot"></span>
@@ -47,43 +48,40 @@
                     <button id="attachBtn" class="btn-icon" title="Attach Document">📎</button>
                     <input type="file" id="fileInput" accept=".pdf,.txt,.docx" hidden>
                     <input type="text" id="chatInput" placeholder="Type a message or trigger extraction..." autocomplete="off">
+                    <button id="stopBtn" class="btn-icon stop-btn hidden" title="Stop Generation">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                    </button>
                     <button id="sendBtn" class="btn-icon send-btn" title="Send Message">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
                     </button>
                 </div>
-                <div id="uploadStatus" class="upload-status hidden">
-                    <span class="badge" id="uploadBadge">Uploading...</span>
+                <div id="uploadProgress" class="upload-progress hidden">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <span class="progress-label" id="progressLabel"></span>
                 </div>
             </div>
         </section>
 
         <!-- Metadata Side Panel -->
-        <section id="metadata-panel" class="panel hidden">
+        <section id="metadata-panel" class="panel">
             <div class="panel-header">
-                <h2>📊 Extraction Results</h2>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <h2>📋 Metadata</h2>
+                    <span id="panelStats" class="badge">
+                        <span id="statExtracted">0</span>/<span id="statTotal">0</span>
+                    </span>
+                </div>
                 <div class="header-actions">
                     <button id="expandAllBtn" class="btn-ghost btn-sm">Expand All</button>
                     <button id="collapseAllBtn" class="btn-ghost btn-sm">Collapse All</button>
-                    <button id="closePanelBtn" class="btn-icon" title="Close Panel" style="margin-left: 10px;">×</button>
+                    <button id="closePanelBtn" class="btn-icon btn-sm" title="Close Panel">✕</button>
                 </div>
             </div>
 
             <div id="resultsContainer" class="results-container">
                 <div id="metadataContent" class="metadata-content">
-                    <div class="summary-stats">
-                        <div class="stat">
-                            <span class="stat-value" id="statExtracted">0</span>
-                            <span class="stat-label">Extracted</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-value muted" id="statNull">0</span>
-                            <span class="stat-label">Missing (null)</span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-value" id="statTotal">0</span>
-                            <span class="stat-label">Total Fields</span>
-                        </div>
-                    </div>
                     <div id="groupsContainer"></div>
                 </div>
                 <div class="panel-footer" style="padding: 1rem; border-top: 1px solid var(--border);">
@@ -101,34 +99,157 @@
         const fileInput = document.getElementById('fileInput');
         const chatInput = document.getElementById('chatInput');
         const sendBtn = document.getElementById('sendBtn');
+        const stopBtn = document.getElementById('stopBtn');
         const messagesContainer = document.getElementById('messagesContainer');
-        const uploadStatus = document.getElementById('uploadStatus');
-        const uploadBadge = document.getElementById('uploadBadge');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const progressFill = document.getElementById('progressFill');
+        const progressLabel = document.getElementById('progressLabel');
         
         const metadataPanel = document.getElementById('metadata-panel');
-        const togglePanelBtn = document.getElementById('togglePanelBtn');
-        const closePanelBtn = document.getElementById('closePanelBtn');
         const groupsContainer = document.getElementById('groupsContainer');
         
-        const statExtracted = document.getElementById('statExtracted');
-        const statNull = document.getElementById('statNull');
-        const statTotal = document.getElementById('statTotal');
         const downloadBtn = document.getElementById('downloadBtn');
         
         const statusText = document.getElementById('statusText');
         const statusIndicator = document.getElementById('statusIndicator');
+        const togglePanelBtn = document.getElementById('togglePanelBtn');
+        const closePanelBtn = document.getElementById('closePanelBtn');
+        const statExtracted = document.getElementById('statExtracted');
+        const statTotal = document.getElementById('statTotal');
+        const statNull = { textContent: '0' }; // Placeholder for compatibility
 
         let schemaData = null;
         let extractedMetadata = null;
         let isProcessing = false;
+        let currentAbortController = null;
+        let pendingUserPrompt = '';
+        let extractionInProgress = false;
+
+        // --- T12: UI Lock during extraction ---
+        function setExtractionLock(locked) {
+            extractionInProgress = locked;
+
+            // Lock chat controls
+            chatInput.disabled = locked;
+            sendBtn.disabled = locked;
+            attachBtn.disabled = locked;
+
+            // Lock all form inputs in metadata panel
+            document.querySelectorAll('.field-dropdown, .dropdown-search, .inline-edit-input').forEach(el => {
+                el.disabled = locked;
+                if (locked) el.style.opacity = '0.5';
+                else el.style.opacity = '1';
+            });
+
+            // Hide/show Ask AI buttons
+            document.querySelectorAll('.ask-ai-btn').forEach(btn => {
+                btn.style.display = locked ? 'none' : '';
+            });
+
+            // Update status indicator
+            if (statusText) statusText.textContent = locked ? 'Processing…' : 'Ready';
+            const dot = document.querySelector('.status-dot');
+            if (dot) {
+                dot.style.backgroundColor = locked ? 'var(--conf-med)' : 'var(--primary)';
+                dot.style.boxShadow = locked ? '0 0 8px var(--conf-med)' : '0 0 8px var(--primary)';
+            }
+        }
+
+        let userModifiedFields = new Set();
 
         async function init() {
             try {
                 const res = await fetch('/api/schema');
                 schemaData = await res.json();
+                renderEmptySchema();
             } catch (err) {
                 console.error("Failed to load schema", err);
             }
+        }
+
+        function updateStats(extracted, nulls, total) {
+            if (statExtracted) statExtracted.textContent = extracted;
+            if (statTotal) statTotal.textContent = total;
+        }
+
+        function renderEmptySchema() {
+            const groups = schemaData.field_groups || schemaData.groups || [];
+            if (!groups.length) return;
+            groupsContainer.innerHTML = '';
+            let totalFields = 0;
+            
+            groups.forEach(group => {
+                const groupName = group.group_name || group.name;
+                const groupEl = document.createElement('div');
+                groupEl.className = 'metadata-group expanded';
+                
+                const header = document.createElement('div');
+                header.className = 'group-header';
+                const fieldCount = (group.fields || []).length;
+                totalFields += fieldCount;
+                
+                header.innerHTML = `
+                    <div class="group-title">
+                        <span class="chevron">▼</span>
+                        ${groupName}
+                    </div>
+                    <div class="group-stats">
+                        <span id="stats-${groupName.replace(/\W/g, '')}">0</span>/${fieldCount}
+                    </div>
+                `;
+                header.addEventListener('click', () => {
+                    groupEl.classList.toggle('expanded');
+                });
+                
+                const fieldsContainer = document.createElement('div');
+                fieldsContainer.className = 'group-fields';
+                
+                group.fields.forEach(field => {
+                    const fieldEl = document.createElement('div');
+                    fieldEl.className = 'field-row';
+                    
+                    const nameElem = document.createElement('div');
+                    nameElem.className = 'field-name';
+                    nameElem.textContent = field.name;
+                    nameElem.title = field.description || "";
+                    
+                    const valElem = document.createElement('div');
+                    valElem.className = 'field-value';
+                    valElem.id = `field-val-${groupName.replace(/\W/g, '')}-${field.name.replace(/\W/g, '')}`;
+                    
+                    // Create Dropdown or Input
+                    if (field.text_values) {
+                        const dropdown = createSearchableDropdown(groupName, field.name, "", field.text_values);
+                        valElem.appendChild(dropdown);
+                    } else {
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.className = 'inline-edit-input field-dropdown';
+                        input.placeholder = '— Select —';
+                        input.addEventListener('change', () => {
+                            userModifiedFields.add(`${groupName}.${field.name}`);
+                            saveField(groupName, field.name, input.value, 'user-provided');
+                        });
+                        valElem.appendChild(input);
+                    }
+                    
+                    const metaActions = document.createElement('div');
+                    metaActions.className = 'field-actions hidden';
+                    metaActions.id = `field-actions-${groupName.replace(/\W/g, '')}-${field.name.replace(/\W/g, '')}`;
+                    
+                    valElem.appendChild(metaActions);
+                    
+                    fieldEl.appendChild(nameElem);
+                    fieldEl.appendChild(valElem);
+                    fieldsContainer.appendChild(fieldEl);
+                });
+                
+                groupEl.appendChild(header);
+                groupEl.appendChild(fieldsContainer);
+                groupsContainer.appendChild(groupEl);
+            });
+            
+            updateStats(0, totalFields, totalFields);
         }
 
         attachBtn.addEventListener('click', () => fileInput.click());
@@ -137,20 +258,15 @@
             if (this.files && this.files.length) {
                 const file = this.files[0];
                 await uploadFile(file);
-                
-                // If there's no chat message, auto-trigger extraction
-                if (!chatInput.value.trim()) {
-                    sendMessage("Extract metadata", true);
-                }
-                
                 this.value = ''; // Reset input
             }
         });
 
         async function uploadFile(file) {
             addSystemMessage(`📄 Uploading: ${file.name} (${(file.size / (1024*1024)).toFixed(2)} MB)...`);
-            uploadStatus.classList.remove('hidden');
-            uploadBadge.textContent = 'Uploading...';
+            uploadProgress.classList.remove('hidden');
+            progressLabel.textContent = 'Uploading...';
+            progressFill.style.width = '10%';
             
             const formData = new FormData();
             formData.append('file', file);
@@ -160,26 +276,79 @@
                     method: 'POST',
                     body: formData
                 });
-                const data = await res.json();
                 
-                if (res.ok) {
-                    addSystemMessage(`✅ Document successfully processed and indexed into ${data.chunk_count} chunks.`);
-                    uploadBadge.textContent = 'Ready';
-                    setTimeout(() => uploadStatus.classList.add('hidden'), 2000);
-                    
-                    // Clear previous metadata
-                    extractedMetadata = null;
-                    groupsContainer.innerHTML = '';
-                    updateStats();
-                    metadataPanel.classList.add('hidden');
-                    togglePanelBtn.classList.add('hidden');
-                } else {
-                    addSystemMessage(`❌ Error: ${data.error}`);
-                    uploadStatus.classList.add('hidden');
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Upload failed');
                 }
+                
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let sseBuffer = "";
+                
+                const progressMap = {
+                    'processing': '15%',
+                    'analyzing': '30%',
+                    'indexing': '50%',
+                    'extracting': '70%',
+                    'refining': '85%',
+                    'metadata': '90%',
+                    'complete': '100%'
+                };
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    sseBuffer += decoder.decode(value, { stream: true });
+                    const lines = sseBuffer.split('\n\n');
+                    sseBuffer = lines.pop(); // keep remainder
+                    
+                    for (const block of lines) {
+                        if (!block.trim()) continue;
+                        if (block.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(block.substring(6));
+                                if (data.error) {
+                                    throw new Error(data.error);
+                                }
+                                
+                                // Lock/unlock UI
+                                if (data.stage === 'lock_ui') {
+                                    setExtractionLock(true);
+                                }
+                                if (data.stage === 'unlock_ui') {
+                                    setExtractionLock(false);
+                                }
+                                
+                                if (data.stage && progressMap[data.stage]) {
+                                    progressFill.style.width = progressMap[data.stage];
+                                }
+                                
+                                if (data.message) {
+                                    progressLabel.textContent = data.message;
+                                }
+                                
+                                if (data.stage === 'metadata' && data.metadata) {
+                                    extractedMetadata = data.metadata;
+                                    renderMetadata(extractedMetadata);
+                                    metadataPanel.classList.remove('hidden');
+                                }
+                                
+                                if (data.stage === 'complete') {
+                                    addSystemMessage(`✅ Document "${data.filename}" processed successfully. You can now ask questions or review metadata.`);
+                                    setTimeout(() => uploadProgress.classList.add('hidden'), 2000);
+                                }
+                            } catch (e) {
+                                console.error("Error parsing SSE JSON", e, block);
+                            }
+                        }
+                    }
+                }
+                
             } catch (err) {
-                addSystemMessage(`❌ Upload failed: ${err.message}`);
-                uploadStatus.classList.add('hidden');
+                addSystemMessage(`❌ Error: ${err.message}`);
+                uploadProgress.classList.add('hidden');
             }
         }
 
@@ -195,20 +364,24 @@
             }
         });
 
-        async function sendMessage(msg, triggerExtraction = false) {
+        async function sendMessage(msg) {
             const text = msg.trim();
-            if (!text && !triggerExtraction) return;
+            if (!text) return;
 
-            if (!triggerExtraction) {
-                addUserMessage(text);
-                chatInput.value = '';
-            }
+            pendingUserPrompt = text;
+
+            addUserMessage(text);
+            chatInput.value = '';
 
             isProcessing = true;
             statusText.textContent = "Processing...";
             statusIndicator.classList.add("processing");
             chatInput.disabled = true;
-            sendBtn.disabled = true;
+            sendBtn.classList.add('hidden');
+            stopBtn.classList.remove('hidden');
+
+            currentAbortController = new AbortController();
+            const signal = currentAbortController.signal;
 
             const assistantMsgElem = createAssistantMessageElem();
 
@@ -216,7 +389,8 @@
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text, trigger_extraction: triggerExtraction })
+                    body: JSON.stringify({ message: text }),
+                    signal: signal
                 });
 
                 if (!res.ok) {
@@ -231,84 +405,112 @@
                 const decoder = new TextDecoder();
                 let fullContent = "";
                 let currentMode = "";
+                let sseBuffer = "";
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    const chunk = decoder.decode(value, { stream: true });
-                    const lines = chunk.split('\n');
+                    sseBuffer += decoder.decode(value, { stream: true });
+                    const events = sseBuffer.split('\n\n');
+                    sseBuffer = events.pop(); // keep the last potentially incomplete chunk in the buffer
 
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const dataStr = line.replace('data: ', '').trim();
-                            if (dataStr === '[DONE]') {
-                                continue;
-                            }
-                            try {
-                                const dataObj = JSON.parse(dataStr);
-                                if (dataObj.error) {
-                                    assistantMsgElem.innerHTML += `<span style="color: #ff6b6b">Error: ${dataObj.error}</span>`;
+                    for (const event of events) {
+                        const lines = event.split('\n');
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const dataStr = line.replace('data: ', '').trim();
+                                if (dataStr === '[DONE]') {
                                     continue;
                                 }
-                                if (dataObj.status === 'extracting') {
-                                    currentMode = dataObj.mode || 'extraction';
-                                    assistantMsgElem.innerHTML = `<span style="color: var(--text-muted)">Extracting metadata...</span>`;
-                                    continue;
-                                }
-                                if (dataObj.content) {
-                                    fullContent += dataObj.content;
-                                    currentMode = dataObj.mode;
-                                    
-                                    if (currentMode !== 'extraction') {
-                                        assistantMsgElem.innerHTML = marked.parse(fullContent);
+                                try {
+                                    const dataObj = JSON.parse(dataStr);
+                                    if (dataObj.error) {
+                                        assistantMsgElem.innerHTML += `<span style="color: #ff6b6b">Error: ${dataObj.error}</span>`;
+                                        continue;
                                     }
-                                    scrollToBottom();
+                                    if (dataObj.status === 'extracting') {
+                                        currentMode = dataObj.mode || 'extraction';
+                                        assistantMsgElem.innerHTML = `<span style="color: var(--text-muted)">Extracting metadata...</span>`;
+                                        continue;
+                                    }
+                                    if (dataObj.response_metadata) {
+                                        extractedMetadata = dataObj.response_metadata;
+                                        
+                                        const fieldCount = Object.values(extractedMetadata)
+                                            .reduce((sum, group) => sum + Object.keys(group).length, 0);
+                                            
+                                        renderResponseMetadata(extractedMetadata);
+                                        metadataPanel.classList.remove('hidden');
+                                        
+                                        const badge = document.createElement('div');
+                                        badge.className = 'metadata-badge';
+                                        badge.innerHTML = `📊 <strong>${fieldCount}</strong> metadata fields detected`;
+                                        assistantMsgElem.appendChild(badge);
+                                        
+                                        continue;
+                                    }
+                                    if (dataObj.content) {
+                                        fullContent += dataObj.content;
+                                        currentMode = dataObj.mode;
+                                        
+                                        if (currentMode !== 'extraction') {
+                                            assistantMsgElem.innerHTML = marked.parse(fullContent);
+                                        }
+                                        scrollToBottom();
+                                    }
+                                } catch (e) {
+                                    console.error('Parse error', e, dataStr);
                                 }
-                            } catch (e) {
-                                console.error('Parse error', e, dataStr);
                             }
                         }
                     }
                 }
                 
                 if (currentMode === 'extraction') {
-                    assistantMsgElem.innerHTML = `✅ Metadata extraction complete. <a href="#" onclick="togglePanelBtn.click(); return false;" style="color: var(--primary);">View Results</a>`;
+                    assistantMsgElem.innerHTML = `✅ Metadata extraction complete.`;
                     try {
                         extractedMetadata = JSON.parse(fullContent.trim());
                         renderMetadata(extractedMetadata);
-                        togglePanelBtn.classList.remove('hidden');
-                        if (!triggerExtraction) {
-                            togglePanel();
-                        } else {
-                            // If auto-triggered on upload, open panel by default
-                            metadataPanel.classList.remove('hidden');
-                        }
+                        metadataPanel.classList.remove('hidden');
                     } catch (e) {
                         assistantMsgElem.innerHTML = `<span style="color: #ff6b6b">Error parsing extraction JSON</span>`;
                     }
-                } else if (currentMode === 'hybrid') {
-                    // Prepend mode badge
-                    assistantMsgElem.innerHTML = `<div class="mode-badge hybrid-badge">Hybrid Mode</div>` + marked.parse(fullContent);
-                } else if (currentMode === 'interaction') {
-                    assistantMsgElem.innerHTML = `<div class="mode-badge interaction-badge">Document Q&A</div>` + marked.parse(fullContent);
+                } else if (currentMode === 'hybrid' || currentMode === 'interaction') {
+                    // No mode badge — just clean response
+                    assistantMsgElem.innerHTML = marked.parse(fullContent);
                 }
 
             } catch (err) {
-                assistantMsgElem.innerHTML = `<span style="color: #ff6b6b">Request failed: ${err.message}</span>`;
+                if (err.name === 'AbortError') {
+                    assistantMsgElem.innerHTML = `<span style="color: var(--text-muted)">Generation stopped.</span>`;
+                } else {
+                    assistantMsgElem.innerHTML = `<span style="color: #ff6b6b">Request failed: ${err.message}</span>`;
+                }
             }
             
             setReady();
         }
+        
+        stopBtn.addEventListener('click', () => {
+            if (currentAbortController) {
+                currentAbortController.abort();
+                currentAbortController = null;
+            }
+            chatInput.value = pendingUserPrompt;
+            setReady();
+        });
         
         function setReady() {
             isProcessing = false;
             statusText.textContent = "Ready";
             statusIndicator.classList.remove("processing");
             chatInput.disabled = false;
-            sendBtn.disabled = false;
+            sendBtn.classList.remove('hidden');
+            stopBtn.classList.add('hidden');
             chatInput.focus();
             scrollToBottom();
+            currentAbortController = null;
         }
 
         function addUserMessage(text) {
@@ -359,71 +561,60 @@
 
         // --- Metadata Rendering Logic ---
         function renderMetadata(data) {
-            groupsContainer.innerHTML = '';
             let extractedCount = 0;
             let nullCount = 0;
             let totalCount = 0;
 
-            if (!schemaData) return;
-
-            for (const [groupName, schemaGroup] of Object.entries(schemaData)) {
-                if (!data[groupName]) continue;
-                
-                const groupData = data[groupName];
-                const groupElem = document.createElement('div');
-                groupElem.className = 'metadata-group';
-
-                const headerElem = document.createElement('div');
-                headerElem.className = 'group-header';
+            const groups = schemaData.field_groups || schemaData.groups || [];
+            for (const schemaGroup of groups) {
+                const groupName = schemaGroup.group_name || schemaGroup.name;
+                const groupData = data[groupName] || {};
                 
                 let groupFilled = 0;
-                let groupTotal = Object.keys(schemaGroup.fields || {}).length;
+                let groupTotal = (schemaGroup.fields || []).length;
                 totalCount += groupTotal;
 
-                for (const key of Object.keys(schemaGroup.fields || {})) {
-                    const fieldVal = groupData[key];
-                    if (fieldVal && fieldVal.value !== null) {
+                for (const field of (schemaGroup.fields || [])) {
+                    const fieldKey = field.name;
+                    const fieldData = groupData[fieldKey];
+                    const valElemId = `field-val-${groupName.replace(/\W/g, '')}-${fieldKey.replace(/\W/g, '')}`;
+                    const valElem = document.getElementById(valElemId);
+                    
+                    if (!valElem) continue;
+
+                    let hasValue = fieldData && fieldData.value !== null;
+                    if (hasValue) {
                         groupFilled++;
                         extractedCount++;
                     } else {
                         nullCount++;
                     }
-                }
+                    
+                    // Only update if not modified by user
+                    if (!userModifiedFields.has(`${groupName}.${fieldKey}`)) {
+                        const inputOrDropdown = valElem.querySelector('input.dropdown-search') || valElem.querySelector('input.inline-edit-input');
+                        if (inputOrDropdown && hasValue) {
+                            if (inputOrDropdown.value !== fieldData.value) {
+                                inputOrDropdown.value = fieldData.value;
+                                inputOrDropdown.classList.add('auto-filled');
+                                setTimeout(() => inputOrDropdown.classList.remove('auto-filled'), 1500);
+                            }
+                        }
+                    }
 
-                headerElem.innerHTML = `
-                    <div class="group-title">
-                        <span class="chevron">▼</span>
-                        ${groupName}
-                    </div>
-                    <div class="group-stats">
-                        ${groupFilled}/${groupTotal}
-                    </div>
-                `;
-
-                const fieldsContainer = document.createElement('div');
-                fieldsContainer.className = 'group-fields';
-
-                for (const [fieldKey, fieldSchema] of Object.entries(schemaGroup.fields || {})) {
-                    const fieldData = groupData[fieldKey];
-                    
-                    const fieldElem = document.createElement('div');
-                    fieldElem.className = 'field-row';
-                    
-                    const nameElem = document.createElement('div');
-                    nameElem.className = 'field-name';
-                    nameElem.textContent = fieldKey;
-                    nameElem.title = fieldSchema.description || "";
-                    
-                    const valElem = document.createElement('div');
-                    valElem.className = 'field-value';
-                    
-                    if (!fieldData || fieldData.value === null) {
-                        valElem.classList.add('null-value');
-                        valElem.textContent = 'null';
-                    } else {
-                        valElem.textContent = typeof fieldData.value === 'object' ? JSON.stringify(fieldData.value) : fieldData.value;
+                    // Update actions/badges
+                    let actionsElem = document.getElementById(`field-actions-${groupName.replace(/\W/g, '')}-${fieldKey.replace(/\W/g, '')}`);
+                    if (actionsElem) {
+                        actionsElem.innerHTML = '';
+                        actionsElem.classList.remove('hidden');
                         
-                        if (fieldData.confidence) {
+                        if (!hasValue && !userModifiedFields.has(`${groupName}.${fieldKey}`) && !extractionInProgress) {
+                            const suggestBtn = document.createElement('button');
+                            suggestBtn.className = 'btn-ghost btn-sm ask-ai-btn';
+                            suggestBtn.innerHTML = '✨ Ask AI';
+                            suggestBtn.onclick = () => suggestField(groupName, fieldKey);
+                            actionsElem.appendChild(suggestBtn);
+                        } else if (hasValue && fieldData.confidence) {
                             const confBadge = document.createElement('span');
                             confBadge.className = 'confidence-badge';
                             confBadge.textContent = fieldData.confidence;
@@ -433,61 +624,47 @@
                             else if (cLower === 'medium') confBadge.classList.add('conf-med');
                             else confBadge.classList.add('conf-low');
                             
-                            valElem.appendChild(confBadge);
-                        }
-                        
-                        if (fieldData.evidence) {
-                            const evButton = document.createElement('button');
-                            evButton.className = 'btn-ghost btn-sm evidence-toggle';
-                            evButton.innerHTML = '🔍';
-                            evButton.title = 'View evidence';
+                            actionsElem.appendChild(confBadge);
                             
-                            const evPanel = document.createElement('div');
-                            evPanel.className = 'evidence-panel hidden';
-                            evPanel.innerHTML = `<strong>Evidence:</strong> "${fieldData.evidence}"<br>
-                                                 <small>Section: ${fieldData.section || 'Unknown'} | Type: ${fieldData.inference_type || 'Unknown'}</small>`;
-                            
-                            evButton.onclick = () => evPanel.classList.toggle('hidden');
-                            
-                            const wrap = document.createElement('div');
-                            wrap.style.display = 'inline-flex';
-                            wrap.style.flexDirection = 'column';
-                            wrap.appendChild(valElem.cloneNode(true));
-                            const flexRow = document.createElement('div');
-                            flexRow.style.display = 'flex';
-                            flexRow.style.alignItems = 'center';
-                            flexRow.style.gap = '8px';
-                            flexRow.appendChild(wrap.firstChild);
-                            flexRow.appendChild(evButton);
-                            
-                            valElem.innerHTML = '';
-                            valElem.appendChild(flexRow);
-                            valElem.appendChild(evPanel);
+                            if (fieldData.evidence) {
+                                const evButton = document.createElement('button');
+                                evButton.className = 'btn-ghost btn-sm evidence-toggle';
+                                evButton.innerHTML = '🔍';
+                                evButton.title = 'View evidence';
+                                
+                                const evPanel = document.createElement('div');
+                                evPanel.className = 'evidence-panel hidden';
+                                evPanel.innerHTML = `<strong>Evidence:</strong> "${fieldData.evidence}"<br>
+                                                     <small>Section: ${fieldData.section || 'Unknown'} | Type: ${fieldData.inference_type || 'Unknown'}</small>`;
+                                
+                                evButton.onclick = () => evPanel.classList.toggle('hidden');
+                                actionsElem.appendChild(evButton);
+                                actionsElem.appendChild(evPanel);
+                            }
                         }
                     }
-                    
-                    fieldElem.appendChild(nameElem);
-                    fieldElem.appendChild(valElem);
-                    fieldsContainer.appendChild(fieldElem);
                 }
 
-                headerElem.onclick = () => {
-                    const chevron = headerElem.querySelector('.chevron');
-                    if (fieldsContainer.style.display === 'none') {
-                        fieldsContainer.style.display = 'block';
-                        chevron.style.transform = 'rotate(0deg)';
-                    } else {
-                        fieldsContainer.style.display = 'none';
-                        chevron.style.transform = 'rotate(-90deg)';
-                    }
-                };
-
-                groupElem.appendChild(headerElem);
-                groupElem.appendChild(fieldsContainer);
-                groupsContainer.appendChild(groupElem);
+                // Update group stats
+                const statsElem = document.getElementById(`stats-${groupName.replace(/\W/g, '')}`);
+                if (statsElem) {
+                    statsElem.textContent = groupFilled;
+                }
             }
             
             updateStats(extractedCount, nullCount, totalCount);
+        }
+        
+        function renderResponseMetadata(data) {
+            // Keep DOM state interactive by reusing renderMetadata
+            renderMetadata(data);
+            
+            // Re-calc basic count for top-level stats display if needed
+            let extractedCount = 0;
+            for (const fields of Object.values(data)) {
+                extractedCount += Object.keys(fields).length;
+            }
+            updateStats(extractedCount, 0, extractedCount);
         }
         
         function updateStats(ext = 0, nul = 0, tot = 0) {
@@ -497,15 +674,13 @@
         }
 
         document.getElementById('expandAllBtn').addEventListener('click', () => {
-            document.querySelectorAll('.group-fields').forEach(el => el.style.display = 'block');
-            document.querySelectorAll('.chevron').forEach(el => el.style.transform = 'rotate(0deg)');
+            document.querySelectorAll('.metadata-group').forEach(el => el.classList.add('expanded'));
         });
         
         document.getElementById('collapseAllBtn').addEventListener('click', () => {
-            document.querySelectorAll('.group-fields').forEach(el => el.style.display = 'none');
-            document.querySelectorAll('.chevron').forEach(el => el.style.transform = 'rotate(-90deg)');
+            document.querySelectorAll('.metadata-group').forEach(el => el.classList.remove('expanded'));
         });
-
+        
         downloadBtn.addEventListener('click', () => {
             if (!extractedMetadata) return;
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(extractedMetadata, null, 2));
@@ -516,6 +691,188 @@
             downloadAnchorNode.click();
             downloadAnchorNode.remove();
         });
+
+        // --- Suggestion and Edit Logic ---
+        function createSearchableDropdown(groupName, fieldKey, currentValue, options) {
+            const container = document.createElement('div');
+            container.className = 'searchable-dropdown';
+            
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'dropdown-search field-dropdown';
+            input.value = currentValue || '';
+            input.placeholder = '— Select —';
+            
+            // Portal: append dropdown list to body for overflow escape
+            const portal = document.createElement('div');
+            portal.className = 'dropdown-portal hidden';
+            document.body.appendChild(portal);
+            
+            function positionPortal() {
+                const rect = input.getBoundingClientRect();
+                portal.style.top = `${rect.bottom + 2}px`;
+                portal.style.left = `${rect.left}px`;
+                portal.style.width = `${rect.width}px`;
+            }
+            
+            function renderOptions(filter = '') {
+                portal.innerHTML = '';
+                const filtered = options.filter(o => 
+                    o.toLowerCase().includes(filter.toLowerCase())
+                ).slice(0, 20);
+                
+                filtered.forEach(opt => {
+                    const item = document.createElement('div');
+                    item.className = 'dropdown-item';
+                    item.textContent = opt;
+                    item.addEventListener('click', () => {
+                        input.value = opt;
+                        portal.classList.add('hidden');
+                        userModifiedFields.add(`${groupName}.${fieldKey}`);
+                        input.classList.add('user-modified');
+                        saveField(groupName, fieldKey, opt, 'user-provided');
+                    });
+                    portal.appendChild(item);
+                });
+            }
+            
+            input.addEventListener('focus', () => {
+                positionPortal();
+                renderOptions('');
+                portal.classList.remove('hidden');
+            });
+            
+            input.addEventListener('input', () => {
+                positionPortal();
+                renderOptions(input.value);
+            });
+            
+            input.addEventListener('change', () => {
+                userModifiedFields.add(`${groupName}.${fieldKey}`);
+                input.classList.add('user-modified');
+                saveField(groupName, fieldKey, input.value, 'user-provided');
+            });
+            
+            // Close portal on outside click
+            document.addEventListener('click', (e) => {
+                if (!container.contains(e.target) && !portal.contains(e.target)) {
+                    portal.classList.add('hidden');
+                }
+            });
+            
+            // Reposition on scroll
+            const resultsContainer = document.getElementById('resultsContainer');
+            if (resultsContainer) {
+                resultsContainer.addEventListener('scroll', () => {
+                    if (!portal.classList.contains('hidden')) positionPortal();
+                });
+            }
+            
+            // Cleanup portal when element is removed from DOM
+            const observer = new MutationObserver(() => {
+                if (!document.body.contains(container)) {
+                    portal.remove();
+                    observer.disconnect();
+                }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+            
+            container.appendChild(input);
+            return container;
+        }
+
+        async function saveField(groupName, fieldKey, value, source) {
+            try {
+                const res = await fetch('/api/metadata/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ group_name: groupName, field_name: fieldKey, value: value, source: source })
+                });
+                if (res.ok) {
+                    const data = await fetch('/api/metadata').then(r => r.json());
+                    extractedMetadata = data;
+                    renderMetadata(extractedMetadata);
+                }
+            } catch (e) {
+                console.error("Save error", e);
+            }
+        }
+
+        async function suggestField(groupName, fieldKey) {
+            // No prompt() dialog — AI generates hints automatically
+            addSystemMessage(`✨ Getting contextual hints for ${fieldKey}...`);
+            
+            try {
+                const res = await fetch('/api/suggest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ group_name: groupName, field_name: fieldKey })
+                });
+                
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let sseBuffer = "";
+                let hintsObj = null;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    sseBuffer += decoder.decode(value, { stream: true });
+                    const events = sseBuffer.split('\n\n');
+                    sseBuffer = events.pop();
+
+                    for (const event of events) {
+                        const lines = event.split('\n');
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const dataStr = line.replace('data: ', '').trim();
+                                if (!dataStr || dataStr === '[DONE]') continue;
+                                const data = JSON.parse(dataStr);
+                                if (data.field_hints) {
+                                    hintsObj = data.field_hints;
+                                } else if (data.error) {
+                                    addSystemMessage(`❌ Hint error: ${data.error}`);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                if (hintsObj && hintsObj.hints && hintsObj.hints.length > 0) {
+                    const actionsElem = document.getElementById(`field-actions-${groupName.replace(/\W/g, '')}-${fieldKey.replace(/\W/g, '')}`);
+                    if (actionsElem) {
+                        actionsElem.innerHTML = '';
+                        
+                        const hintsPanel = document.createElement('div');
+                        hintsPanel.className = 'ai-suggestion-popover';
+                        
+                        let hintsHTML = '<div style="margin-bottom: 8px;"><strong>💡 Document Hints:</strong></div>';
+                        hintsHTML += '<ul style="margin: 0; padding-left: 1.2rem; list-style-type: disc;">';
+                        for (const hint of hintsObj.hints) {
+                            hintsHTML += `<li style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; font-style: italic;">${hint}</li>`;
+                        }
+                        hintsHTML += '</ul>';
+                        hintsHTML += '<div style="margin-top: 8px;"><button class="btn-ghost btn-sm dismiss-hints-btn">Dismiss</button></div>';
+                        
+                        hintsPanel.innerHTML = hintsHTML;
+                        
+                        hintsPanel.querySelector('.dismiss-hints-btn').onclick = () => {
+                            hintsPanel.remove();
+                            renderMetadata(extractedMetadata);
+                        };
+                        
+                        actionsElem.appendChild(hintsPanel);
+                    }
+                } else {
+                    addSystemMessage(`💡 No relevant hints found for ${fieldKey} in the document.`);
+                }
+
+            } catch (err) {
+                addSystemMessage(`❌ Request failed: ${err.message}`);
+            }
+        }
 
         // Init
         init();

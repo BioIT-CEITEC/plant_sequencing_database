@@ -1,0 +1,6 @@
+{
+    "python.analysis.extraPaths": [
+        "f:/Collab/plant_breeding/code"
+    ],
+    "python.defaultInterpreterPath": "/mnt/f/Collab/plant_breeding/bin/python"
+}

@@ -1,449 +1,293 @@
-"""
-app.py — Flask backend for the Crop Development Research Assistant (Tri-Modal System).
-"""
-
 import os
-import sys
 import json
-import uuid
-import re
-import difflib
-
-# Ensure venv site-packages are on the path
-VENV_SITE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "lib", "python3.12", "site-packages"
-)
-if VENV_SITE not in sys.path:
-    sys.path.insert(0, VENV_SITE)
-
-from flask import Flask, render_template, request, jsonify, Response, session
+import dataclasses
+from flask import Flask, request, jsonify, render_template, session, Response, stream_with_context
 from flask_session import Session
 from werkzeug.utils import secure_filename
-from dotenv import load_dotenv
-from openai import OpenAI
 
-from manuscript_parser import extract_text
-from retrieval_engine import chunk_text, embed_chunks, query_chunks, clear_session, build_schema_index, score_field_relevance, retrieve_evidence
+from config import config
+from core.contracts import PipelineRequest, CompletionRequest
+from ingestion.parser import DocumentParser
+from ingestion.chunker import Chunker
+from indexing.indexer import Indexer
+from retrieval.retriever import Retriever
+from reasoning.llm_caller import LLMCaller
+from reasoning.prompt_builder import PromptBuilder
+from extraction.schema_registry import SchemaRegistry
+from extraction.validator import Validator
+from extraction.extractor import MetadataExtractor
+from orchestration.session_manager import SessionManager
+from orchestration.orchestrator import Orchestrator
 
-# Load environment variables
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
-
-app = Flask(__name__,
-            template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"),
-            static_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), "static"))
-
-app.config["SESSION_PERMANENT"] = True
+app = Flask(__name__)
 app.config["SESSION_TYPE"] = "filesystem"
-app.config["SESSION_FILE_DIR"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "flask_session")
-os.makedirs(app.config["SESSION_FILE_DIR"], exist_ok=True)
+app.config["SECRET_KEY"] = os.urandom(24)
 Session(app)
 
-# Initialize LLM client
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openai")
-LLM_MODEL = os.getenv("LLM_MODEL", "glm-4.7" if LLM_PROVIDER == "cerit" else "gpt-4o")
+os.makedirs(config.UPLOAD_FOLDER, exist_ok=True)
 
-if LLM_PROVIDER == "cerit":
-    client = OpenAI(
-        api_key=os.getenv("CERIT_API_KEY"),
-        base_url=os.getenv("CERIT_BASE_URL", "https://llm.ai.e-infra.cz/v1/")
-    )
-else:
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Initialize singletons
+schema_registry = SchemaRegistry()
+schema_registry.load()
 
-# Setup paths for upload and metadata
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "documents")
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+llm_provider = config.get_llm_provider()
+vector_store = config.get_vector_store()
 
-METADATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "metadata")
-SCHEMA_PATH = os.path.join(METADATA_DIR, "sample_metadata.json")
-SKILL_PATH = os.path.join(METADATA_DIR, "extraction_skill.md")
+llm_caller = LLMCaller(llm_provider)
+parser = DocumentParser()
+chunker = Chunker()
+indexer = Indexer(vector_store)
+reranker = config.get_reranker()
+retriever = Retriever(vector_store, reranker)
+validator = Validator(schema_registry)
+extractor = MetadataExtractor(schema_registry, validator, llm_caller)
+session_manager = SessionManager(vector_store)
+orchestrator = Orchestrator(session_manager, retriever, extractor, llm_caller, schema_registry)
 
-# Load schema and skill once at startup
+# Initialize schema vector index on startup
 try:
-    with open(SCHEMA_PATH, 'r', encoding='utf-8') as f:
-        SCHEMA_DATA = json.load(f)
-    with open(SKILL_PATH, 'r', encoding='utf-8') as f:
-        EXTRACTION_SKILL = f.read()
+    schema_registry.build_index(indexer)
 except Exception as e:
-    print(f"Error loading metadata files: {e}")
-    SCHEMA_DATA = {}
-    EXTRACTION_SKILL = ""
+    print(f"Warning: Failed to build schema index on startup: {e}")
 
-def build_schema_maps(raw_schema):
-    schema_for_llm = {}
-    schema_for_ui = {}
-    for group in raw_schema.get("field_groups", []):
-        gname = group["group_name"]
-        fields_llm = {}
-        fields_ui = {}
-        for field in group.get("fields", []):
-            fname = field["name"]
-            fields_llm[fname] = {
-                "field_type": field.get("field_type"),
-                "text_values": field.get("text_values")
-            }
-            fields_ui[fname] = {
-                "field_type": field.get("field_type"),
-                "text_values": field.get("text_values")
-            }
-        schema_for_llm[gname] = fields_llm
-        schema_for_ui[gname] = {
-            "restriction_type": group.get("restriction_type"),
-            "fields": fields_ui
-        }
-    return schema_for_llm, schema_for_ui
-
-SCHEMA_FOR_LLM, SCHEMA_FOR_UI = build_schema_maps(SCHEMA_DATA)
-
-try:
-    build_schema_index(SCHEMA_DATA, EXTRACTION_SKILL)
-except Exception as e:
-    print(f"Error building schema index: {e}")
-
-def fuzzy_match_vocab(value, vocab):
-    if not value or not vocab: return value, False
-    matches = difflib.get_close_matches(str(value).lower(), [str(v).lower() for v in vocab], n=1, cutoff=0.8)
-    if matches:
-        for v in vocab:
-            if str(v).lower() == matches[0]:
-                return v, True
-    return value, False
-
-def validate_extraction(raw_json_str, schema_for_llm):
-    try:
-        data = json.loads(raw_json_str)
-    except json.JSONDecodeError as e:
-        return None, {"error": f"JSON parse failed: {e}"}
+@app.errorhandler(Exception)
+def handle_exception(e):
+    # Handle 404 errors specifically to avoid noisy tracebacks in debug mode
+    from werkzeug.exceptions import HTTPException, NotFound
     
-    validated = {}
-    diagnostics = {"extracted": 0, "null": 0, "total": 0, "warnings": []}
-    
-    for group_name, fields_spec in schema_for_llm.items():
-        group_data = data.get(group_name, {})
-        if not isinstance(group_data, dict):
-            diagnostics["warnings"].append(f"Group '{group_name}' is not a dict")
-            group_data = {}
+    if isinstance(e, NotFound):
+        if request.path.startswith('/api/'):
+            return jsonify({"error": "Endpoint not found"}), 404
+        return render_template("index.html"), 200 # Fallback to index for SPA-like behavior or just let it 404
+
+    if request.path.startswith('/api/'):
+        return jsonify({"error": str(e)}), 500
         
-        validated_group = {}
-        for field_name in fields_spec:
-            diagnostics["total"] += 1
-            field_val = group_data.get(field_name)
-            
-            if field_val is None:
-                validated_group[field_name] = {"value": None, "evidence": None, "confidence": None}
-                diagnostics["null"] += 1
-            elif isinstance(field_val, dict) and "value" in field_val:
-                validated_group[field_name] = field_val
-                if field_val["value"] is not None:
-                    diagnostics["extracted"] += 1
-                else:
-                    diagnostics["null"] += 1
-            else:
-                validated_group[field_name] = {"value": field_val, "evidence": None, "confidence": "medium"}
-                diagnostics["extracted"] += 1
-                diagnostics["warnings"].append(f"Field '{field_name}' had bare value, wrapped")
-        
-        validated[group_name] = validated_group
-    
-    return validated, diagnostics
+    # For non-API routes, re-raise the exception to use default handlers
+    raise e
+
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
+
+
+
 
 @app.route("/")
 def index():
-    """Serve the main extraction interface."""
     return render_template("index.html")
 
 
-@app.route("/api/schema")
+@app.route("/api/schema", methods=["GET"])
 def get_schema():
-    """Return the schema field groups so the UI knows what to render."""
-    return jsonify(SCHEMA_FOR_UI)
+    return jsonify(schema_registry.get_schema_for_ui())
 
 
 @app.route("/api/upload", methods=["POST"])
-def upload():
-    """
-    Handle file upload, extract text, chunk, embed, and store in session.
-    """
-    if 'file' not in request.files:
+def upload_file():
+    if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "Empty filename"}), 400
-
-    filename = secure_filename(file.filename)
-    ext = filename.lower().split('.')[-1]
-    
-    if ext not in ['pdf', 'txt', 'docx']:
-        return jsonify({"error": f"Unsupported format: .{ext}. Only PDF, TXT, DOCX allowed."}), 400
-
-    # Ensure a session ID exists
-    if not session.get("session_id"):
-        session["session_id"] = str(uuid.uuid4())
-        session["chat_history"] = []
-    
-    # If a previous file was uploaded, clear its vector store
-    if session.get("document_filename"):
-        clear_session(session["session_id"])
         
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(file_path)
-
-    # Extract text from document
-    text, error = extract_text(file_path, filename)
-    if error:
-        return jsonify({"error": error}), 500
-    if not text or not text.strip():
-        return jsonify({"error": "Extracted text is empty or unreadable."}), 500
-
-    session["document_text"] = text
-    session["document_filename"] = filename
-    session["extracted_metadata"] = None
+    file = request.files["file"]
+    if not file.filename:
+        return jsonify({"error": "Empty filename"}), 400
+        
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(config.UPLOAD_FOLDER, filename)
+    file.save(filepath)
     
-    # Chunk and embed
-    chunks = chunk_text(text, filename)
-    embed_chunks(session["session_id"], chunks)
+    # Ensure session is created before headers are sent
+    if "session_id" in session:
+        session_manager.clear_document(session)
+    else:
+        session_manager.create(session)
+        
+    def generate():
+        try:
+            # --- Lock UI: block chat/edits during processing ---
+            yield f"data: {json.dumps({'stage': 'lock_ui', 'message': 'Processing — please wait…'})}\n\n"
 
-    return jsonify({"filename": filename, "chunk_count": len(chunks), "status": "success"})
+            yield f"data: {json.dumps({'stage': 'processing', 'message': 'Processing document…'})}\n\n"
+            text, error = parser.parse(filepath, filename)
+            if error:
+                yield f"data: {json.dumps({'stage': 'unlock_ui'})}\n\n"
+                yield f"data: {json.dumps({'error': error})}\n\n"
+                return
+                
+            yield f"data: {json.dumps({'stage': 'analyzing', 'message': 'Analyzing content…'})}\n\n"
+            chunks = chunker.chunk(text, filename)
+            session["chunk_count"] = len(chunks)
+            session["document_filename"] = filename
+            
+            yield f"data: {json.dumps({'stage': 'indexing', 'message': f'Building knowledge base ({len(chunks)} chunks)…'})}\n\n"
+            
+            def on_progress(current, total):
+                pass # Optional: can send progress here if needed
+                
+            indexer.index(session["session_id"], chunks, on_progress=on_progress)
+            
+            # --- Phase 1: Single-pass structured extraction (fast) ---
+            yield f"data: {json.dumps({'stage': 'extracting', 'message': 'Extracting metadata (single-pass)…'})}\n\n"
+            
+            result = extractor.extract_single_pass(retriever, session["session_id"])
+            
+            # Convert to serializable dict and emit all fields at once
+            all_fields = {}
+            for group_name, group_data in result.fields.items():
+                group_dict = {}
+                for k, v in group_data.items():
+                    if dataclasses.is_dataclass(v):
+                        group_dict[k] = dataclasses.asdict(v)
+                    elif isinstance(v, dict):
+                        group_dict[k] = v
+                all_fields[group_name] = group_dict
+            
+            yield f"data: {json.dumps({'stage': 'metadata', 'metadata': all_fields})}\n\n"
+
+            # --- Phase 2: Async refinement for null/low-confidence fields ---
+            null_count = sum(
+                1 for g in result.fields.values()
+                for f in g.values() if f.value is None
+            )
+            
+            if null_count > 0:
+                yield f"data: {json.dumps({'stage': 'refining', 'message': f'Refining {null_count} missing fields…'})}\n\n"
+                
+                result = extractor.refine_missing_fields(result, retriever, session["session_id"])
+                
+                # Re-serialize and emit updated fields
+                all_fields = {}
+                for group_name, group_data in result.fields.items():
+                    group_dict = {}
+                    for k, v in group_data.items():
+                        if dataclasses.is_dataclass(v):
+                            group_dict[k] = dataclasses.asdict(v)
+                        elif isinstance(v, dict):
+                            group_dict[k] = v
+                    all_fields[group_name] = group_dict
+
+                yield f"data: {json.dumps({'stage': 'metadata', 'metadata': all_fields})}\n\n"
+
+            session["extracted_metadata"] = all_fields
+
+            # --- Unlock UI: re-enable chat/edits ---
+            yield f"data: {json.dumps({'stage': 'unlock_ui'})}\n\n"
+            yield f"data: {json.dumps({'stage': 'complete', 'message': 'Ready — metadata extracted', 'filename': filename})}\n\n"
+            
+        except Exception as e:
+            # Revert session state if indexing fails
+            session_manager.clear_document(session)
+            yield f"data: {json.dumps({'stage': 'unlock_ui'})}\n\n"
+            yield f"data: {json.dumps({'error': 'Indexing/Extraction failed: ' + str(e)})}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
-    """
-    Handle chat messages and route to Extraction, Interaction, or Hybrid mode.
-    """
-    data = request.json
-    if not data:
-        return jsonify({"error": "No JSON payload provided"}), 400
+    if "session_id" not in session:
+        return jsonify({"error": "No active session. Please upload a document first."}), 400
         
-    user_message = data.get("message", "").strip()
-    is_extraction_trigger = data.get("trigger_extraction", False)
+    data = request.json or {}
+    user_message = data.get("message", "")
     
-    if not session.get("session_id"):
-        session["session_id"] = str(uuid.uuid4())
-        session["chat_history"] = []
-        
-    document_text = session.get("document_text")
-    if not document_text:
-        return jsonify({"error": "Please upload a document first."}), 400
-        
-    # Append to chat history
-    if user_message:
-        chat_history = session.get("chat_history", [])
-        chat_history.append({"role": "user", "content": user_message})
-        if len(chat_history) > 20:
-            chat_history = chat_history[-20:]
-        session["chat_history"] = chat_history
-
-    # Determine mode
-    mode = "interaction"
-    if is_extraction_trigger or user_message.lower() in ["extract", "extract metadata", "extract data"]:
-        mode = "extraction"
-    elif user_message and session.get("extracted_metadata"):
-        # Simple heuristic for hybrid mode: check if schema fields are mentioned
-        schema_keys = str(SCHEMA_DATA).lower()
-        words = set(re.findall(r'\w+', user_message.lower()))
-        if any(w in schema_keys and len(w) > 4 for w in words):
-             mode = "hybrid"
-
-    # Route based on mode
-    if mode == "extraction":
-        return stream_extraction(session["session_id"], document_text)
-    elif mode == "hybrid":
-        return stream_hybrid(session["session_id"], user_message, session.get("extracted_metadata"))
-    else:
-        return stream_interaction(session["session_id"], user_message)
-
-
-def stream_extraction(session_id, document_text):
+    pipeline_request = PipelineRequest(
+        session_id=session["session_id"],
+        user_message=user_message,
+        mode="interaction",
+        schema_data=schema_registry.get_schema_for_ui(),
+        extracted_metadata=session.get("extracted_metadata", {})
+    )
+    
     def generate():
         try:
-            # Stage 1: Field Relevance Scoring
-            yield f"data: {json.dumps({'status': 'extracting', 'mode': 'extraction', 'message': 'Finding relevant fields...'})}\n\n"
-            relevant_groups = score_field_relevance(session_id, SCHEMA_DATA)
-            
-            all_results = {}
-            for group_name, fields_llm in SCHEMA_FOR_LLM.items():
-                if group_name not in relevant_groups:
-                    all_results[group_name] = {
-                        fname: {"value": None, "evidence": None, "confidence": None}
-                        for fname in fields_llm
-                    }
-                    continue
-                    
-                field_names = list(fields_llm.keys())
-                yield f"data: {json.dumps({'status': 'extracting', 'mode': 'extraction', 'message': f'Extracting {group_name}...'})}\n\n"
-                
-                # Stage 2: Evidence Retrieval
-                evidence_chunks = retrieve_evidence(session_id, field_names, top_k=5)
-                context = "\n\n".join(evidence_chunks)
-                
-                if not context.strip():
-                    all_results[group_name] = {
-                        fname: {"value": None, "evidence": None, "confidence": None}
-                        for fname in fields_llm
-                    }
-                    continue
-                    
-                # Stage 3: Focused Extraction
-                prompt = f"""Extract values for these fields from the text below.
-For each field, return JSON: {{"field_name": {{"value": "...", "evidence": "verbatim quote", "confidence": "high|medium|low"}}}}
-If a field cannot be found, set value to null.
-Return JSON only.
-
-Fields: {', '.join(field_names)}
-
-Text:
-{context}"""
-                
-                create_kwargs = {
-                    "model": LLM_MODEL,
-                    "messages": [
-                        {"role": "system", "content": "You are a metadata extraction engine. Return JSON only."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.0
-                }
-                if LLM_PROVIDER == "openai":
-                    create_kwargs["response_format"] = {"type": "json_object"}
-                    
-                response = client.chat.completions.create(**create_kwargs)
-                raw_json = response.choices[0].message.content.strip()
-                raw_json = re.sub(r'```(?:json)?\s*\n?(.*?)\n?```', r'\1', raw_json, flags=re.DOTALL).strip()
-                
-                try:
-                    group_data = json.loads(raw_json)
-                except Exception:
-                    group_data = {}
-                    
-                # Post-processing & Validation
-                validated_group = {}
-                for fname in field_names:
-                    fval = group_data.get(fname)
-                    
-                    if fval is None:
-                        validated_group[fname] = {"value": None, "evidence": None, "confidence": None}
-                    elif isinstance(fval, dict) and "value" in fval:
-                        val = fval.get("value")
-                        if val and fields_llm[fname].get("field_type") == "TEXT_CHOICE_FIELD":
-                            matched_val, is_matched = fuzzy_match_vocab(val, fields_llm[fname].get("text_values", []))
-                            if is_matched:
-                                fval["value"] = matched_val
-                        validated_group[fname] = fval
-                    else:
-                        val = fval
-                        if val and fields_llm[fname].get("field_type") == "TEXT_CHOICE_FIELD":
-                            matched_val, is_matched = fuzzy_match_vocab(val, fields_llm[fname].get("text_values", []))
-                            if is_matched:
-                                val = matched_val
-                        validated_group[fname] = {"value": val, "evidence": None, "confidence": "medium"}
-                        
-                all_results[group_name] = validated_group
-                
-            validated_json, diag = validate_extraction(json.dumps(all_results), SCHEMA_FOR_LLM)
-            if validated_json is None:
-                yield f"data: {json.dumps({'error': diag['error']})}\n\n"
-                return
-                
-            session["extracted_metadata"] = validated_json
-            yield f"data: {json.dumps({'content': json.dumps(validated_json), 'mode': 'extraction'})}\n\n"
-            yield "data: [DONE]\n\n"
+            for event in orchestrator.execute(pipeline_request):
+                if not event.startswith("data: ") and not event.startswith("\n\n"):
+                    # basic chat chunk
+                    yield f"data: {json.dumps({'content': event})}\n\n"
+                else:
+                    yield event
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
-    return Response(generate(), mimetype="text/event-stream")
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
 
-def stream_interaction(session_id, user_message):
-    chunks = query_chunks(session_id, user_message, top_k=5)
-    context_text = "\n\n---\n\n".join([f"Chunk from {c['metadata']['source_file']}:\n{c['text']}" for c in chunks])
+@app.route("/api/suggest", methods=["POST"])
+def suggest_field():
+    if "session_id" not in session:
+        return jsonify({"error": "No active session."}), 400
+        
+    data = request.json or {}
+    field_name = data.get("field_name")
+    group_name = data.get("group_name")
+    user_context = data.get("user_context")
     
-    system_prompt = """You are a helpful, document-grounded research assistant. 
-Answer the user's question using ONLY the provided document context.
-Do not hallucinate. If the answer is not in the context, explicitly state that you cannot find it in the uploaded document.
-Always cite your evidence based on the context."""
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Context chunks:\n\n{context_text}\n\nUser Question: {user_message}"}
-    ]
-
+    if not field_name or not group_name:
+        return jsonify({"error": "Missing field_name or group_name"}), 400
+        
+    completion_req = CompletionRequest(
+        session_id=session["session_id"],
+        field_name=field_name,
+        group_name=group_name,
+        user_context=user_context
+    )
+    
     def generate():
         try:
-            stream = client.chat.completions.create(
-                model=LLM_MODEL,
-                messages=messages,
-                stream=True,
-                temperature=0.2
-            )
-            full_response = ""
-            for chunk in stream:
-                delta = chunk.choices[0].delta
-                if delta.content:
-                    full_response += delta.content
-                    yield f"data: {json.dumps({'content': delta.content, 'mode': 'interaction'})}\n\n"
-            
-            # Update history
-            chat_history = session.get("chat_history", [])
-            chat_history.append({"role": "assistant", "content": full_response})
-            session["chat_history"] = chat_history
-            yield "data: [DONE]\n\n"
+            for event in orchestrator.execute_completion(completion_req):
+                yield event
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
-    return Response(generate(), mimetype="text/event-stream")
-
-
-def stream_hybrid(session_id, user_message, extracted_metadata):
-    chunks = query_chunks(session_id, user_message, top_k=5)
-    context_text = "\n\n---\n\n".join([f"Chunk from {c['metadata']['source_file']}:\n{c['text']}" for c in chunks])
+@app.route("/api/metadata/update", methods=["POST"])
+def update_metadata():
+    if "session_id" not in session:
+        return jsonify({"error": "No active session."}), 400
+        
+    data = request.json or {}
+    group_name = data.get("group_name")
+    field_name = data.get("field_name")
+    value = data.get("value")
+    source = data.get("source", "user-provided")
     
-    system_prompt = """You are a helpful, document-grounded research assistant. 
-You have access to both retrieved text chunks from the document AND previously extracted structured metadata.
-Answer the user's question by combining information from both sources. 
-Reference the extracted metadata explicitly if it answers the question.
-Do not hallucinate."""
+    if not group_name or not field_name:
+        return jsonify({"error": "Missing group_name or field_name"}), 400
+        
+    extracted = session.get("extracted_metadata", {})
+    if group_name not in extracted:
+        extracted[group_name] = {}
+        
+    if field_name not in extracted[group_name]:
+        extracted[group_name][field_name] = {
+            "field_name": field_name,
+            "group_name": group_name,
+            "confidence": "high",
+            "evidence": None,
+            "inference_type": "reported",
+            "section": None
+        }
+        
+    extracted[group_name][field_name]["value"] = value
+    extracted[group_name][field_name]["source"] = source
+    session["extracted_metadata"] = extracted
+    
+    return jsonify({"success": True, "updated_field": extracted[group_name][field_name]})
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Extracted Metadata:\n{extracted_metadata}\n\nContext chunks:\n\n{context_text}\n\nUser Question: {user_message}"}
-    ]
-
-    def generate():
-        try:
-            stream = client.chat.completions.create(
-                model=LLM_MODEL,
-                messages=messages,
-                stream=True,
-                temperature=0.2
-            )
-            full_response = ""
-            for chunk in stream:
-                delta = chunk.choices[0].delta
-                if delta.content:
-                    full_response += delta.content
-                    yield f"data: {json.dumps({'content': delta.content, 'mode': 'hybrid'})}\n\n"
-            
-            chat_history = session.get("chat_history", [])
-            chat_history.append({"role": "assistant", "content": full_response})
-            session["chat_history"] = chat_history
-            yield "data: [DONE]\n\n"
-        except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-
-    return Response(generate(), mimetype="text/event-stream")
-
+@app.route("/api/metadata", methods=["GET"])
+def get_metadata():
+    if "session_id" not in session:
+        return jsonify({"error": "No active session."}), 400
+    return jsonify(session.get("extracted_metadata", {}))
 
 @app.route("/api/session", methods=["DELETE"])
-def clear_session_route():
-    """Clear session data and delete vector store collection."""
-    if session.get("session_id"):
-        clear_session(session["session_id"])
+def clear_session():
+    if "session_id" in session:
+        session_manager.clear_document(session)
     session.clear()
-    return jsonify({"status": "success"})
-
+    return jsonify({"message": "Session cleared"})
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000, threaded=True)
